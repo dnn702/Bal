@@ -1,7 +1,7 @@
 {
   "name": "Idle balls MOD",
   "short_name": "Idle Balls",
-  "start_url": "./bbx.html",
+  "start_url": "./bmx.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
