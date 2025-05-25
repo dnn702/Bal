@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Idle Balls風ゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin: 0; font-family: sans-serif; text-align: center; background: #eef; }
+    #game { position: relative; width: 100%; height: 60vh; background: #fff; overflow: hidden; }
+    .circle {
+      position: absolute; width: 60px; height: 60px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: bold; font-size: 14px; user-select: none; cursor: pointer;
+    }
+    .ball {
+      position: absolute; width: 20px; height: 20px; border-radius: 50%;
+    }
+    .info { margin: 10px; }
+    button { margin: 5px; padding: 8px 16px; font-size: 14px; }
+    .ball-info { border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px; }
+  /* 既存のCSSのあとに追記 */
+  #ballUpgrades {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 10px;
+    gap: 10px;
+    scroll-snap-type: x mandatory;
+  }
+
+  #ballUpgrades button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+      #ballUpgrades {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 10px;
+  gap: 10px;
+  scroll-snap-type: x mandatory;
+}
+
+#ballUpgrades button {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+
+  </style>
+</head>
+<body>
+  <h1>Idle Balls風ゲーム</h1>
+<p id="mo"><button onclick="tupd()">MOD</button></p>
+  <div class="info">
+    <div>ポイント: <span id="points">0</span></div>
+    <div id="ballUpgrades"></div>
+<button onclick="tupg()">Tap Upgrade</button>
+    <div class="ball-info">
+      <h3>Ball Info</h3>
+      <div id="ballInfo"></div>
+    </div>
+  </div>
+  <div id="game"></div>
+
+  <script>
+    const ATTACK_NUM = 3n, ATTACK_DEN = 2n;
+    const COST_NUM = 17n, COST_DEN = 10n;
+    let points = 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n;
+    let stage = 1;
+    let circles = [];
+    let balls = [];
+    let tapAttack = 1n;
+    let tapCost = 0n;
+
+    const UNITS = (() => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz';
+      const u = ['', 'k', 'm', 'b', 't', 'q', 'Q', 's', 'S', 'o', 'n', 'd', 'u', 'D', 'T', 'qu', 'Qu', 'sx', 'sp', 'O', 'N', 'v', 'U', 'tv', 'qv', 'Qv', 'sv', 'Sv', 'ov', 'nv', 'tg', 'ut', 'dt', 'tt', 'qt', 'Qt', 'st', 'St', 'ot', 'nt', 'qg', 'uq', 'dq', 'tq', 'qq', 'Qq', 'sq', 'Sq', 'oq', 'nq', 'qi', 'Uq', 'Dq', 'Tq', 'qa', 'qn', 'Sx', 'Sp', 'Oq', 'Nq', 'sg', 'us', 'ds', 'ts', 'qs', 'Qs', 'ss', 'Ss', 'os', 'ns', 'Sg', 'Us', 'Ds', 'Ts', 'qi', 'Qi', 'se', 'Se', 'Os', 'Ns', 'og', 'uo', 'do', 'to', 'qo', 'Qo', 'so', 'So', 'oo', 'no', 'ng', 'un', 'dn', 'tn', 'qu', 'Qu', 'sn', 'Sn', 'on', 'nn', 'c', 'uc', 'dc', 'tc', 'qc', 'Qc', 'sc', 'Sc', 'oc', 'nc', 'Dc', 'udc', 'ddc', 'tdc', 'qdc', 'Qdc', 'sdc', 'Sdc', 'odc', 'ndc', 'V', 'Uv', 'Dv', 'Tv', 'QA', 'QI', 'svc', 'Svc', 'Ovc', 'Nvc', 'trc', 'Utc', 'Dtc', 'ttc', 'qtc', 'Qtc', 'stc', 'Stc', 'otc', 'ntc', 'qgc', 'uqc', 'dqc', 'tqc', 'qqc', 'Qqc', 'sqc', 'Sqc', 'oqc', 'nqc', 'Qgc', 'Uqc', 'Dqc', 'Tqc', 'qQc', 'QQc', 'sQc', 'SQc', 'oqc', 'nqc', 'sgc', 'usc', 'dsc', 'tsc', 'qsc', 'Qsc', 'ssc', 'Ssc', 'osc', 'nsc', 'Sgc', 'Usc', 'Dsc', 'Tsc', 'qSc', 'QSc', 'sSc', 'SSc', 'Osc', 'Nsc', 'ogc', 'uoc', 'doc', 'toc', 'qoc', 'Qoc', 'soc', 'Soc', 'ooc', 'noc', 'ngc', 'unc', 'dnc', 'tnc', 'qnc', 'Qnc', 'snc', 'Snc', 'onc', 'nnc', 'duc', 'Udc', 'Ddc', 'Tdc', 'qDc', 'QDc', 'sDc', 'SDc', 'Odc', 'Ndc', 'dedc', 'uddc', 'dddc', 'tddc', 'qddc', 'Qddc', 'sddc', 'Sddc', 'oddc', 'nddc', 'vdc', 'uvdc', 'dvdc', 'tvdc', 'qvdc', 'Qvdc', 'svdc', 'Svdc', 'ovdc', 'nvdc', 'Tdc', 'utdc', 'dtdc', 'ttdc', 'qtdc', 'Qtdc', 'stdc', 'Stdc', 'otdc', 'ntdc', 'qgdc', 'uqdc', 'dqdc', 'tqdc', 'qqdc', 'Qqdc', 'sqdc', 'Sqdc', 'oqdc', 'nqdc', 'Qgdc', 'Uqdc', 'Dqdc', 'Tqdc', 'qQdc', 'QQdc', 'sQdc', 'SQdc', 'Oqdc', 'Nqdc', 'sgdc', 'usdc', 'dsdc', 'tsdc', 'qsdc', 'Qsdc', 'ssdc', 'Ssdc', 'osdc', 'nsdc', 'Sgdc', 'Usdc', 'Dsdc', 'Tsdc', 'qSdc', 'QSdc', 'sSdc', 'SSdc', 'Osdc', 'Nsdc', 'Ogdc', 'uodc', 'dodc', 'todc', 'qodc', 'Qodc', 'sodc', 'Sodc', 'oodc', 'nodc', 'Ngdc', 'undc', 'dndc', 'tndc', 'qndc', 'Qndc', 'sndc', 'Sndc', 'ondc', 'nndc', 'Trc', 'utrc', 'dtrc', 'ttrc', 'qtrc', 'Qtrc', 'strc', 'Strc', 'otrc', 'ntrc', 'Dtrc', 'udtc', 'ddtc', 'tdtc', 'qdtc', 'Qdtc', 'sdtc', 'Sdtc', 'odtc', 'ndtc', 'vtc', 'uvtc', 'dvtc', 'tvtc', 'qvtc', 'Qvtc', 'svtc', 'Svtc', 'ovtc', 'nvtc', 'Ttc', 'uttc', 'dttc', 'tttc', 'qttc', 'Qttc', 'sttc', 'Sttc', 'ottc', 'nttc', 'qTc', 'uqtc', 'dqtc', 'tqtc', 'qqtc', 'Qqtc', 'sqtc', 'Sqtc', 'oqtc', 'nqtc', 'QTc', 'Uqtc', 'Dqtc', 'Tqtc', 'qQtc', 'QQtc', 'sQtc', 'SQtc', 'Oqtc', 'Nqtc', 'sTc', 'ustc', 'dstc', 'tstc', 'qstc', 'Qstc', 'sstc', 'Sstc', 'ostc', 'nstc', 'STc', 'Ustc', 'Dstc', 'Tstc', 'qStc', 'QStc', 'sStc', 'SStc', 'Ostc', 'Nstc', 'Otc', 'uotc', 'dotc', 'totc', 'qotc', 'Qotc', 'sotc', 'Sotc', 'ootc', 'notc', 'Ntc', 'untc', 'dntc', 'tntc', 'qntc', 'Qntc', 'sntc', 'Sntc', 'ontc', 'nntc', 'Qg', 'uqg', 'dqg', 'tqg', 'qqg', 'Qqg', 'sqg', 'Sqg', 'oqg', 'nqg', 'Dqg', 'udqg', 'ddqg', 'tdqg', 'qdqg', 'Qdqg', 'sdqg', 'Sdqg', 'odqg', 'ndqg', 'vqg', 'uvqg', 'dvqg', 'tvqg', 'qvqg', 'Qvqg', 'svqg', 'Svqg', 'ovqg', 'nvqg', 'Tqg', 'utqg', 'dtqg', 'ttqg', 'qtqg', 'Qtqg', 'stqg', 'Stqg', 'otqg', 'ntqg', 'qQg', 'uqqg', 'dqqg', 'tqqg', 'qqqg', 'Qqqg', 'sqqg', 'Sqqg', 'oqqg', 'nqqg', 'QQg', 'Uqqg', 'Dqqg', 'Tqqg', 'qQqg', 'QQqg', 'sQqg', 'SQqg', 'Oqqg', 'Nqqg', 'sQg', 'usqg', 'dsqg', 'tsqg', 'qsqg', 'Qsqg', 'ssqg', 'Ssqg', 'osqg', 'nsqg', 'SQg', 'Usqg', 'Dsqg', 'Tsqg', 'qSqg', 'QSqg', 'sSqg', 'SSqg', 'Osqg', 'Nsqg', 'Oqg', 'uoqg', 'doqg', 'toqg', 'qoqg', 'Qoqg', 'soqg', 'Soqg', 'ooqg', 'noqg', 'Nqg', 'unqg', 'dnqg', 'tnqg', 'qnqg', 'Qnqg', 'snqg', 'Snqg', 'onqg', 'nnqg', 'QG', 'Uqg', 'DQg', 'TQg', 'qaqg', 'qiqg', 'sxqg', 'spqg', 'OQg', 'NQg', 'DQG', 'Udqg', 'Ddqg', 'Tdqg', 'qDqg', 'QDqg', 'sDqg', 'SDqg', 'Odqg', 'Ndqg', 'Vqg', 'Uvqg', 'Dvqg', 'Tvqg', 'qVqg', 'QVqg', 'sVqg', 'SVqg', 'Ovqg', 'Nvqg', 'TQG', 'Utqg', 'Dtqg', 'Ttqg', 'qTqg', 'QTqg', 'sTqg', 'STqg', 'Otqg', 'Ntqg', 'Qaqg', 'uQqg', 'dQqg', 'tQqg', 'qqQg', 'QqQg', 'sqQg', 'SqQg', 'oQqg', 'nQqg', 'Qiqg', 'UQqg', 'DQqg', 'TQqg', 'qQQg', 'QQQg', 'sQQg', 'SQQg', 'OQqg', 'NQqg', 'Sxqg', 'uSqg', 'dSqg', 'tSqg', 'qsQg', 'QsQg', 'ssQg', 'SsQg', 'oSqg', 'nSqg', 'Spqg', 'USqg', 'DSqg', 'TSqg', 'qSQg', 'QSQg', 'sSQg', 'SSQg', 'OSqg', 'NSqg', 'SC', 'ussc', 'dssc', 'tssc', 'qssc', 'Qssc', 'sssc', 'Sssc', 'ossc', 'nssc', 'Desc', 'udsc', 'ddsc', 'tdsc', 'qdsc', 'Qdsc', 'sdsc', 'Sdsc', 'odsc', 'ndsc', 'vsc', 'uvsc', 'dvsc', 'tvsc', 'qvsc', 'Qvsc', 'svsc', 'Svsc', 'ovsc', 'nvsc', 'trsc', 'utsc', 'dtsc', 'ttsc', 'qtsc', 'Qtsc', 'stsc', 'Stsc', 'otsc', 'ntsc', 'qasc', 'uqsc', 'dqsc', 'tqsc', 'qqsc', 'Qqsc', 'sqsc', 'Sqsc', 'oqsc', 'nqsc', 'qisc', 'Uqsc', 'Dqsc', 'Tqsc', 'qQsc', 'QQsc', 'sQsc', 'SQsc', 'Oqsc', 'Nqsc', 'sesc', 'Ussc', 'Dssc', 'Tssc', 'qSsc', 'QSsc', 'sSsc', 'SSsc', 'Ossc', 'Nssc', 'spsc', 'USsc', 'DSsc', 'TSsc', 'qSSc', 'QSSc', 'sSSc', 'SSSc', 'OSsc', 'NSsc', 'ogsc', 'uosc', 'dosc', 'tosc', 'qosc', 'Qosc', 'sosc', 'Sosc', 'oosc', 'nosc', 'ngsc', 'unsc', 'dnsc', 'tnsc', 'qnsc', 'Qnsc', 'snsc', 'Snsc', 'onsc', 'nnsc', 'SG', 'usg', 'dsg', 'tsg', 'qsg', 'Qsg', 'ssg', 'Ssg', 'osg', 'nsg', 'Dsg', 'udsg', 'ddsg', 'tdsg', 'qdsg', 'Qdsg', 'sdsg', 'Sdsg', 'odsg', 'ndsg', 'vsg', 'uvsg', 'dvsg', 'tvsg', 'qvsg', 'Qvsg', 'svsg', 'Svsg', 'ovsg', 'nvsg', 'Tsg', 'utsg', 'dtsg', 'ttsg', 'qtsg', 'Qtsg', 'stsg', 'Stsg', 'otsg', 'ntsg', 'qSg', 'uqsg', 'dqsg', 'tqsg', 'qqsg', 'Qqsg', 'sqsg', 'Sqsg', 'oqsg', 'nqsg', 'QSg', 'Uqsg', 'Dqsg', 'Tqsg', 'qQsg', 'QQsg', 'sQsg', 'SQsg', 'Oqsg', 'Nqsg', 'sSg', 'ussg', 'dssg', 'tssg', 'qssg', 'Qssg', 'sssg', 'Sssg', 'ossg', 'nssg', 'SSg', 'Ussg', 'Dssg', 'Tssg', 'qSsg', 'QSsg', 'sSsg', 'SSsg', 'Ossg', 'Nssg', 'Osg', 'uosg', 'dosg', 'tosg', 'qosg', 'Qosg', 'sosg', 'Sosg', 'oosg', 'nosg', 'Nsg', 'unsg', 'dnsg', 'tnsg', 'qnsg', 'Qnsg', 'snsg', 'Snsg', 'onsg', 'nnsg', 'ocg', 'uocg', 'docg', 'tocg', 'qocg', 'Qocg', 'socg', 'Socg', 'oocg', 'nocg', 'Docg', 'udog', 'ddog', 'tdog', 'qdog', 'Qdog', 'sdog', 'Sdog', 'odog', 'ndog', 'vog', 'uvog', 'dvog', 'tvog', 'qvog', 'Qvog', 'svog', 'Svog', 'ovog', 'nvog', 'tog', 'utog', 'dtog', 'ttog', 'qtog', 'Qtog', 'stog', 'Stog', 'otog', 'ntog', 'qog', 'uqog', 'dqog', 'tqog', 'qqog', 'Qqog', 'sqog', 'Sqog', 'oqog', 'nqog', 'Qog', 'Uqog', 'Dqog', 'Tqog', 'qQog', 'QQog', 'sQog', 'SQog', 'Oqog', 'Nqog', 'sog', 'usog', 'dsog', 'tsog', 'qsog', 'Qsog', 'ssog', 'Ssog', 'osog', 'nsog', 'Sog', 'Usog', 'Dsog', 'Tsog', 'qSog', 'QSog', 'sSog', 'SSog', 'Osog', 'Nsog', 'oog', 'uoog', 'doog', 'toog', 'qoog', 'Qoog', 'soog', 'Soog', 'ooog', 'noog', 'nog', 'unog', 'dnog', 'tnog', 'qnog', 'Qnog', 'snog', 'Snog', 'onog', 'nnog', 'Ng', 'ung', 'dng', 'tng', 'qng', 'Qng', 'sng', 'Sng', 'ong', 'nng', 'Dng', 'udng', 'ddng', 'tdng', 'qdng', 'Qdng', 'sdng', 'Sdng', 'odng', 'ndng', 'vng', 'uvng', 'dvng', 'tvng', 'qvng', 'Qvng', 'svng', 'Svng', 'ovng', 'nvng', 'Tng', 'utng', 'dtng', 'ttng', 'qtng', 'Qtng', 'stng', 'Stng', 'otng', 'ntng', 'qNg', 'uqng', 'dqng', 'tqng', 'qqng', 'Qqng', 'sqng', 'Sqng', 'oqng', 'nqng', 'QNg', 'Uqng', 'Dqng', 'Tqng', 'qQng', 'QQng', 'sQng', 'SQng', 'Oqng', 'Nqng', 'sNg', 'usng', 'dsng', 'tsng', 'qsng', 'Qsng', 'ssng', 'Ssng', 'osng', 'nsng', 'SNg', 'Usng', 'Dsng', 'Tsng', 'qSng', 'QSng', 'sSng', 'SSng', 'Osng', 'Nsng', 'Ong', 'uong', 'dong', 'tong', 'qong', 'Qong', 'song', 'Song', 'oong', 'nong', 'Nng', 'unng', 'dnng', 'tnng', 'qnng', 'Qnng', 'snng', 'Snng', 'onng', 'nnng', 'M', 'um', 'dm', 'tm', 'qm', 'Qm', 'sm', 'Sm', 'om', 'nm', 'Dm', 'vm', 'Tm', 'qM', 'QM', 'sM', 'SM', 'Om', 'Nm', 'cm', 'ucm', 'dcm', 'tcm', 'qcm', 'Qcm', 'scm', 'Scm', 'ocm', 'ncm', 'ducm', 'trcm', 'qacm', 'qicm', 'sCm', 'SCm', 'Ocm', 'Ncm', 'dum', 'trm', 'qam', 'Qam', 'sem', 'spm', 'octm', 'nonm', 'my', 'umy', 'dmy', 'tmy', 'qmy', 'Qmy', 'smy', 'Smy', 'omy', 'nmy', 'Dmy', 'vmy', 'dumy', 'trmy', 'qamy', 'qimy', 'semy', 'spmy', 'Omy', 'Nmy', 'cmy', 'mc', 'umc', 'tmc', 'qmc', 'Qmc', 'smc', 'Smc', 'omc', 'nmc', 'Dmc', 'vmc', 'dumc', 'trmc', 'qamc', 'qimc', 'semc', 'spmc', 'Omc', 'Nmc', 'cmc', 'dkm', 'na', 'una', 'dna', 'tna', 'qna', 'Qna', 'sna', 'Sna', 'ona', 'nna', 'Dna', 'vna', 'Tna', 'qNa', 'QNa', 'sNa', 'SNa', 'Ona', 'Nna', 'cna', 'mna', 'mcna', 'mmna', 'Duna', 'trna', 'qana', 'qina', 'sena', 'spna', 'ocna', 'nona', 'nag', 'unag', 'dnag', 'tnag', 'qnag', 'Qnag', 'snag', 'Snag', 'onag', 'nnag', 'Dnag', 'vnag', 'Tnag', 'qNag', 'QNag', 'sNag', 'SNag', 'Onag', 'Nnag', 'cnag', 'mnag', 'DUng', 'Tnag', 'qNAg', 'QNAg', 'sNAg', 'SNAg', 'ONag', 'NNag', 'pc', 'upc', 'dpc', 'tpc', 'qpc', 'Qpc', 'spc', 'Spc', 'opc', 'npc', 'Dpc', 'vpc', 'Tpc', 'qPc', 'QPc', 'sPc', 'SPc', 'Opc', 'Npc', 'mpc', 'mcpc', 'mmpc', 'dupc', 'Trpc', 'qapc', 'qipc', 'sepc', 'sppc', 'ocpc', 'nopc', 'cpc', 'fe', 'ufe', 'dfe', 'tfe', 'qfe', 'Qfe', 'sfe', 'Sfe', 'ofe', 'nfe', 'Dfe', 'vfe', 'Tfe', 'qFe', 'QFe', 'sFe', 'SFe', 'Ofe', 'Nfe', 'mfe', 'mcfe', 'mmfe', 'pcfe', 'dufe', 'trfe', 'qafe', 'qife', 'sefe', 'spfe', 'ocfe', 'nofe', 'cfe', 'At', 'uat', 'dat', 'tat', 'qat', 'Qat', 'sat', 'Sat', 'oat', 'nat', 'Dat', 'vat', 'Tat', 'qAt', 'QAt', 'sAt', 'SAt', 'Oat', 'Nat', 'mat', 'mcat', 'mmat', 'pcat', 'feat', 'duat', 'trat', 'qaat', 'qiat', 'seat', 'spat', 'ocat', 'noat', 'cat', 'Zt', 'uzt', 'dzt', 'tzt', 'qzt', 'Qzt', 'szt', 'Szt', 'ozt', 'nzt', 'Dzt', 'vzt', 'Tzt', 'qZt', 'QZt', 'sZt', 'SZt', 'Ozt', 'Nzt', 'mzt', 'mczt', 'mmzt', 'pczt', 'fezt', 'atzt', 'duzt', 'trzt', 'qazt', 'qizt', 'sezt', 'spzt', 'oczt', 'nozt', 'czt', 'Yt', 'uyt', 'dyt', 'tyt', 'qyt', 'Qyt', 'syt', 'Syt', 'oyt', 'nyt', 'Dyt', 'vyt', 'Tyt', 'qYt', 'QYt', 'sYt', 'SYt', 'Oyt', 'Nyt', 'myt', 'mcyt', 'mmyt', 'pcyt', 'feyt', 'atyt', 'ztyt', 'duyt', 'tryt', 'qayt', 'qiyt', 'seyt', 'spyt', 'ocyt', 'noyt', 'cyt', 'Xo', 'uxo', 'dxo', 'txo', 'qxo', 'Qxo', 'sxo', 'Sxo', 'oxo', 'nxo', 'Dxo', 'vxo', 'Txo', 'qXo', 'QXo', 'sXo', 'SXo', 'Oxo', 'Nxo', 'mxo', 'mcxo', 'mmxo', 'pcxo', 'fexo', 'atxo', 'ztxo', 'ytxo', 'duxo', 'trxo', 'qaxo', 'qixo', 'sexo', 'spxo', 'ocxo', 'noxo', 'p', 'P', 'g', 'G', 'h', 'H', 'l', 'L', 'i', 'I', 'j', 'J', 'n', 'N', 'c', 'C', 'v', 'V', 'w', 'W', 'x', 'X', 'y', 'Y', 'z', 'Z', 'vv', 'VV', 'ww', 'WW', 'xx', 'XX', 'yy', 'YY', 'zz', 'ZZ', 'Xt', 'Wt', 'xt', 'yt', 'zt', 'xp', 'yp', 'zp', 'xc', 'yc', 'zc', 'xg', 'yg', 'zg', 'wX', 'Vh', 'Ih', 'xk', 'yk', 'zk', 'xe', 'ye', 'ze', 'xr', 'yr', 'zr',  'Xp', 'Yp', 'Zp', 'Xc', 'Yc', 'Zc', 'Xg', 'Yg', 'Zg', 'Xk', 'Yk', 'Zk', 'Xe', 'Ye', 'Ze', 'Xr', 'Yr', 'Zr', 'xj', 'Xj', 'XJ', 'yj', 'Yj', 'YJ', 'zj', 'Zj', 'ZJ', 'nj', 'ajj', 'Aj', 'xu', 'Xu', 'XU', 'yu', 'Yu', 'YU', 'zu', 'Zu', 'ZU', 'tx', 'ty', 'tz', 'tX', 'tY', 'tZ', 'TX', 'TY', 'TZ', 'Xx', 'Yy', 'Zz', 'xX', 'yY', 'zZ', 'xy', 'yx', 'Xy', 'Yx', 'xY', 'yX', 'XY', 'YX', 'xz', 'zx', 'Xz', 'Zx', 'xZ', 'zX', 'XZ', 'ZX', 'zy', 'yz', 'Zy', 'Yz', 'zY', 'yZ', 'ZY', 'YZ', 'Gxz', 'ugxz', 'dgxz', 'tgxz', 'qgxz', 'Qgxz', 'sgxz', 'Sgxz', 'ogxz', 'ngxz', 'Dgxz', 'vgxz', 'Tgxz', 'qGxz', 'QGxz', 'sGxz', 'SGxz', 'Ogxz', 'Ngxz', 'dGxz', 'tGxz', 'qGXz', 'QGXz', 'sGXz', 'SGXz', 'oGxz', 'nGxz', 'ygxz', 'Ygxz', 'Igxz', 'Vgxz', 'Bgxz', 'SGXZ', 'OGxz', 'NGxz', 'NGXz', 'cgxz', 'Cgxz', 'CGxz', 'CGXz', 'Nx', 'Ny', 'Nz', 'NX', 'NY', 'NZ', 'xq', 'yq', 'zq', 'Xq', 'Yq', 'Zq', 'xQ', 'yQ', 'zQ', 'XQ', 'YQ', 'ZQ', 'x+', 'X+', 'y+', 'Y+', 'z+', 'Z+', 'v+', 'V+', 'w+', 'W+', 'Vg', 'Ce', 'Hx', 'Hy', 'Hz', 'Mx', 'My', 'Mz', 'HX', 'HY', 'HZ', 'MX', 'MY', 'MZ', 'iix', 'iiy', 'iiz', 'IIx', 'IIy', 'IIz', 'iiX', 'iiY', 'iiZ', 'iIx', 'iIy', 'iIz', 'Iix', 'Iiy', 'Iiz', 'iIX', 'iIY', 'iIZ', 'IiX', 'IiY', 'IiZ', 'IIX', 'IIY', 'IIZ', 'xxx', 'yyy', 'zzz', 'XXX', 'YYY', 'ZZZ', 'xxxx', 'yyyy', 'zzzz', 'XXXX', 'YYYY', 'ZZZZ', 'wxyz', 'WXYZ', 'Zpt', 'uzpt', 'dzpt', 'tzpt', 'qzpt', 'Qzpt', 'szpt', 'Szpt', 'ozpt', 'nzpt', 'Dzpt', 'vzpt', 'Tzpt', 'qZpt', 'QZpt', 'sZpt', 'SZpt', 'Ozpt', 'Nzpt', 'xzpt', 'Xzpt', 'yzpt', 'Yzpt', 'zzpt', 'Zzpt', 'mzpt', 'Mzpt', 'bzpt', 'Bzpt', 'gzpt', 'Gzpt', 'hzpt', 'Hzpt', 'izpt', 'Izpt', 'iZpt', 'IZpt', 'hZpt', 'HZpt', 'jzpt', 'Jzpt', 'lzpt', 'Lzpt', 'wzpt', 'Wzpt', 'Vzpt', 'VZpt', 'dZpt', 'tZpt', 'qZPt', 'QZPt', 'sZPt', 'SZPt', 'oZpt', 'nZpt', 'czpt', 'Czpt', 'Cez', 'CeZ', 'vb', 'Vb', 'vB', 'VB', 'bB', 'Bb', 'BB', 'nb', 'Nb', 'nB', 'NB', 'k2', 'm2', 'b2', 't2', 'q2', 'Q2', 's2', 'S2', 'o2', 'n2', 'd2', 'ud2', 'dd2', 'td2', 'qd2', 'Qd2', 'sd2', 'Sd2', 'od2', 'nd', 'v2', 'vG', 'VG', 'ig', 'Ig', 'iG', 'IG', 'wg', 'Wg', 'wG', 'WG', 'X', 'Y', 'Z','!', '!!', '!!!', '!!!!', '!!!!!', '?', '??', '???', '????', '?????', '!!?', '?!!', '??!', '!??', '!?!', '?!?', '!?', '?!', '!!!', '???', 'Gc', 'CC', 'ZN', 'Un', 'Ad', '□', '■', '○', '●', '◇', '◆', '△', '▲', '▽', '▼', '▦', '∞', 'XS', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '♕', '♛', '♖', '♜', '♗', '♝', '♘', '♞', '♙', '♟', '☠', '☻', '★', '✫', '☰', '☷', '☲', '☵', '☶', '☳', '☴', '☱', '☩', '⇔', '✤', '✿', '❀', '𖡗', 'ꕥ', '╬', '∵', 'Zz', 'Qd', 'Qi', 'LL', 'WW', 'XC', 'DD', 'iii', 'III', 'UU', 'Yn', 'Vi', 'あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'pO', 'HW', 'EE', 'Gt', '∆', '©', '〄', 'JN', 'D○', '◘', '◘◘', '◘◘◘', 'BY', 'Yy', 'NL', 'UI', 'IU', 'gS', 'n', 'N', 'iO', 'Gh', '∫', '∬', '∫∫', '₪', '¤', '₠', '✡', '✣', '✾', '❆', '✳', '♡', '♤', '♢', '♧', '◎', '✖', '◐', '◑', '✐', 'ღ', '✆', '♯', '☼', '®', 'š', 'Š', '֍', '֎', 'ଞ', 'JJ', 'VIC', 'H!', 'N!', 'U!', '⣿', '⧇', '⧺', '⧻', 'CCC', '࿊', '࿋', '࿌', '⧲', '⧳', '⨌', '⨕', '⨖', '⨘', '⨷', '⨸', '⩨', '⩩', '▢', '▤', '▥', '▧', '▨', '▩', '◙', '◚', '◛', '◴', '◵', '◶', '◷', '☪', '☫', '☬', '☹', '𐄡', '𐄠', '𐄪', 'XP', 'XD', 'XYZ', '𐇛', '𐜕', '𓐂', '𓐋', '𓐁', '𓏿', '𔘳', '𔘒', '𔗲', '𔗢', '𔗠', '𔗡', '𔗪', '𔗬', '𖦘', '𖦧', '𖥸', '𖥟', '𖤓', '𖤅', '𖣘', '𖣐', '𖣥', '𖢰', '𖢫', '𖫤', '𖫖', '𖬻', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'ゐ', 'ゔ', 'ゑ', 'を', 'ん', 'が', 'ぎ', 'ぐ', 'げ', 'ご', 'ざ', 'じ', 'ず', 'ぜ', 'ぞ', 'だ', 'ぢ', 'づ', 'で', 'ど', 'ば', 'び', 'ぶ', 'べ', 'ぼ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'っ', 'ゃ', 'ゅ', 'ょ', 'YS', 'ZS', 'NNN', 'NNP', 'DX', 'BTS', 'STB', 'NOT', '🀆', '🀑', '🀒', '🀓', '🀔', '🀕', '🀖', '🀗', '🀘', '🀫', '🀙', '🀚', '🀛', '🀜', '🀝', '🀞', '🀟', '🀠', '🀡', '🀆🀆', '🀠🀠', '🀦',  '🀧', '🀨', '🀩', 'ABC', '私組絵', 'ↀ', 'ↁ', 'ↂ', 'ↇ', 'ↈ', '⇪', '⇫', '⇬', '⇭', '⇮', '≈', '≉', '≋', '≍', '≎', '≑', '≒', '≓', '≖', '≡', '≣', '≠', '≭', '⊞', '⊕', '⊖', '⊗', '⊘', '⊙', '⊚', '⊜', '⊟', '⊠', '⊡', '⋒', '⋓', '⋕', '⋇', '⋮', '⌸', '⌹', '⌺', '⌻', '⌼', '⌽', '⌾', '⍁', '⍂', '⍇', '⍈', '⍌', '⍍', '⍉', '⍣', '⍤', '⍠', '⍟', '⍯', '⎕', '⎈', '⎅', '⎃', '⎂', '⏭', '⏩', '⏪', '⏫', '⏬', '␀', '␁', '␂', '␃', '␄', '␢', '␦', '␤', '␥', '⑀', '⑁', '⑂', '⑃', '⑄', '⑅', '⑆', '⑇', '⑊', '⑈', '⑉', '╳', '▀', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '▐', '░', '▒', '▓', '▔', '▖', '▘', '▙', '▟', '▞', '▚', '▛', '▜', '☦', '☘', '☤', '☣', '☢', '♳', '♴', '♵', '♶', '♷', '♸', '♹', '♺', '♲', '♻', '♽', '♼', '♾', '⚆', '⚇', '⚈', '⚉', '⚊', '⚋', '⚌', '⚍', '⚎', '⚏', '⚒', '⚔', '⚕', '⚖', '⚙', '⚚', '⚛', '⚜', '⚝', '⚠', '⚡', '⚢', '⚣', '⚤', '⚥', '⚦', '⚧', '⚨', '⚩', '⚭', '⚮', '⚯', '⛀', '⛁', '⛂', '⛃', '⛆', '⛇', '⛒', '⛋', '⛌', '⛏', '⛐', '⛓', '⛕', '⛗', '⛖', '⛘', '⛚', '⛛', '⛜', '⛝', '⛞', '⛟', '⛠', '⛡', '⛢', '⛣', '⛤', '⛥', '⛦', '⛧', '⛨', '⛩', '⛫', '⛬', '⛭', '⛮', '⛯', '⛰', '⛷', '⛴', '⛶', '⛹', '⛸', '⛼', '⛻', '⛾', '⛿', '✂', '✄', '✑', '✒', '✶', '✷', '✸', '✹', '✺', '✻', '✼', '✽', '✾', '❁', '❂', '❃', '❅', '❆', '❇', '❈', '❉', '❊', '❋', '❍', '❏', '❐', '❑', '❒', '❖', '❘', '❙', '❚', '❝', '❞', '❢', '❣', '❥', '❦', '❧', '➘', '➙', '➚', '➛', '➜', 'HJ', 'YO', 'RS', 'n', 'N', 'CC', 'hU', 'yB', 'Tc', '∝', '∽', '𐂠', 'ᯓ', '𓇢', '​ஜ', 'uM', 'IS', 'SI', 'i!', 'I!', 'NG', 'Job', 'Kg', 'Ks', 'Rd', 'nd', 'ynD', '§', '√', '𐂗', '𐂞', '𐂜', '𐂘', '𐂬', '𐄙', '𐄚', '𐄛', '𐄜', '𐄝', '𐄞', '𐄟', '𐄠', '𐄡', '𐄢', '𐄣', '𐄤', '𐄥', '𐄦', '𐄧', '𐄨', '𐄩', '𐄪', '𐄫', '𐄬', '𐄭', '𐄮', '𐄯', '𐄰', '𐄱', '𐄲', '𐄳', '𐄺', '𐇣', '𐇤', '𐇧', '𐇐', '𐇵', '𑄣', '𑄦', '𑄠', '𑄊', '𑄇', '𑃳', '𑃰', '𖥹', '𖥗', '𖥚', '𖤼', '𖣯', '𖣯𖣯', '𖥚𖥚', 'HO', '𖥗𖥗', '𖥚𖣯', '𖥗!', '!!!!', '‽', '¡!', '!¡', '¡?', '‽!', '¿?', '!‽', '?¿', '死', '墓', 'やだ', '菓子', 'n', 'N', 'Fz', 'zF', 'fZ', 'Zf', 'i!i', 'uX', '何', 'ǅ', 'ŵ', 'Ŵ', 'Œ', 'ũ', 'Ũ', 'ū', 'Ū', 'ŭ', 'Ŭ', 'ů', 'Ů', 'ű', 'Ű', 'ų', 'Ų', 'ŧ', 'Ŧ', 'į', 'Į', 'ĩ', 'Ĩ', 'ī', 'Ī', 'ĥ', 'Ĥ', 'ħ', 'Ħ', '฿', 'ะ', '༅', '༄', '།', '༎', '༕', '༖', '༓', '࿕', '࿖', '࿗', '࿘', 'CO', 'NO', 'Vig', 'XZ', 'XZZ', 'NZ', 'DH', 'CH', 'BH', 'AH', 'EH', 'FH', 'GHH', 'HHH', 'IH', 'JH', 'LH', 'MH', 'NH', 'OH', 'PH', 'QH', 'RH', 'SH', 'n', 'N', 'TH', 'UH', 'VH', 'WH', 'XH', 'YH', 'ZH', 'jJ', 'CBA', 'gA', 'eA', 'aN', 'lN', 'rN', 'oG', 'Wh', 'Wd', 'WD', 'Qx', 'QX', 'Hu', 'Gi', 'Qw', 'QW', 'ω', 'Ω', '{}', '()', '[]', 'Xg', '<img src="images/Screenshot_20250427_212014.jpg" style="height: 14px; width: 14px;"></img>', '<img src="images/c.png" style="height: 14px; width: 14px;"></img>', '<img src="images/d.png" style="height: 14px; width: 14px;"></img>', '<img src="images/e.png" style="height: 14px; width: 14px;"></img>', '<img src="images/f.png" style="height: 14px; width: 14px;"></img>', '<img src="images/g.png" style="height: 14px; width: 14px;"></img>', '<img src="images/h.png" style="height: 14px; width: 14px;"></img>', '<img src="images/i.png" style="height: 14px; width: 14px;"></img>', '<img src="images/j.png" style="height: 14px; width: 14px;"></img>', '<img src="images/k.png" style="height: 14px; width: 14px;"></img>', '<img src="images/jon.png" style="height: 14px; width: 14px;"></img>', '<img src="images/iPhone.png" style="height: 14px; width: 7px;"></img>', '<img src="images/m.png" style="height: 14px; width: 14px;"></img>', '<img src="images/hng.png" style="height: 14px; width: 14px;"></img>', '<img src="images/o.png" style="height: 14px; width: 14px;"></img>', '<img src="images/p.png" style="height: 14px; width: 14px;"></img>', '<img src="images/q.png" style="height: 14px; width: 14px;"></img>', '<img src="images/r.png" style="height: 14px; width: 14px;"></img>', '<img src="images/s.png" style="height: 14px; width: 14px;"></img>', '<img src="images/t.png" style="height: 14px; width: 14px;"></img>', '<img src="images/u.png" style="height: 14px; width: 14px;"></img>', '<img src="images/v.png" style="height: 14px; width: 14px;"></img>', '<img src="images/w.png" style="height: 14px; width: 14px;"></img>', '<img src="images/x.png" style="height: 14px; width: 14px;"></img>', '<img src="images/y.png" style="height: 14px; width: 14px;"></img>', '<img src="images/z.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aa.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ab.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ac.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ad.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ae.png" style="height: 14px; width: 14px;"></img>', '<img src="images/af.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ag.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ah.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ai.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ak.png" style="height: 14px; width: 14px;"></img>', '<img src="images/al.png" style="height: 14px; width: 14px;"></img>', '<img src="images/am.png" style="height: 14px; width: 14px;"></img>', '<img src="images/an.png" style="height: 14px; width: 14px;"></img>', 'VK', 'Ob', 'Ot', 'St', 'Mt', 'Ht', '!X', '!!X', '<img src="images/ao.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ap.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aq.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ar.png" style="height: 14px; width: 14px;"></img>', '<img src="images/as.png" style="height: 14px; width: 14px;"></img>', '<img src="images/at.png" style="height: 14px; width: 14px;"></img>', '<img src="images/au.png" style="height: 14px; width: 14px;"></img>', '<img src="images/av.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aw.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ax.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ay.png" style="height: 14px; width: 14px;"></img>', '<img src="images/az.png" style="height: 14px; width: 7px;"></img>', '<img src="images/ba.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bb.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bc.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bd.png" style="height: 14px; width: 14px;"></img>', '<img src="images/be.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bf.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bg.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bh.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bi.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bk.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bl.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bm.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bn.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bo.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bp.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bq.png" style="height: 14px; width: 14px;"></img>', '<img src="images/br.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bs.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bt.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bu.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bv.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bw.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bx.png" style="height: 14px; width: 14px;"></img>', '<img src="images/by.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bz.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ca.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cb.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cc.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cd.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ce.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cf.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cg.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ch.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ci.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ck.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cl.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cm.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cn.png" style="height: 14px; width: 14px;"></img>', '<img src="images/co.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cp.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cq.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cr.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cs.png" style="height: 14px; width: 14px;"></img>', '<img src="images/1.png" style="height: 14px; width: 14px;"></img>', '<img src="images/2.png" style="height: 14px; width: 14px;"></img>', '<img src="images/3.png" style="height: 14px; width: 14px;"></img>', '<img src="images/4.png" style="height: 14px; width: 14px;"></img>', '<img src="images/5.png" style="height: 14px; width: 14px;"></img>', '<img src="images/6.png" style="height: 14px; width: 14px;"></img>', '<img src="images/7.png" style="height: 14px; width: 14px;"></img>', '<img src="images/8.png" style="height: 14px; width: 14px;"></img>', '<img src="images/悪口.png" style="height: 14px; width: 14px;"></img>', '<img src="images/9.png" style="height: 14px; width: 14px;"></img>', '<img src="images/10.png" style="height: 14px; width: 14px;"></img>', '<img src="images/11.png" style="height: 14px; width: 14px;"></img>', '<img src="images/12.png" style="height: 14px; width: 14px;"></img>', '<img src="images/13.png" style="height: 14px; width: 14px;"></img>', '<img src="images/14.png" style="height: 14px; width: 14px;"></img>', '<img src="images/15.png" style="height: 14px; width: 14px;"></img>', '<img src="images/16.png" style="height: 14px; width: 14px;"></img>', '<img src="images/17.png" style="height: 17px; width: 14px;"></img>', '<img src="images/18.png" style="height: 18px; width: 14px;"></img>', '<img src="images/19.png" style="height: 19px; width: 14px;"></img>', '<img src="images/20.png" style="height: 14px; width: 14px;"></img>', '<img src="images/papasika.png" style="height: 14px; width: 14px;"></img>'];
+      for (let len = 2; len <= 3; len++) {
+        (function build(prefix, depth) {
+          if (depth === 0) u.push(prefix);
+          else for (const c of chars) build(prefix + c, depth - 1);
+        })('', len);
+      }
+      return u;
+    })();
+
+    function formatBigIntNumber(value) {
+      const thousand = 1000n;
+      if (value < thousand) return value.toString();
+      let unitIndex = 0;
+      let current = value;
+      while (current >= thousand && unitIndex < UNITS.length - 1) {
+        current /= thousand;
+        unitIndex++;
+      }
+      const divisor = thousand ** BigInt(unitIndex);
+      const whole = value / divisor;
+      const remainder = value % divisor;
+      const digits = whole.toString().length;
+      let result = '';
+      if (digits === 1) {
+        const decimal = ((remainder * 100n) / divisor).toString().padStart(2, '0');
+        result = `${whole}.${decimal}`;
+      } else if (digits === 2) {
+        const decimal = ((remainder * 10n) / divisor).toString();
+        result = `${whole}.${decimal}`;
+      } else {
+        result = `${whole}`;
+      }
+      return result + UNITS[unitIndex];
+    }
+
+    function getColor(hp, maxHp) {
+      const pct = Number(hp * 100n / maxHp);
+      if (pct > 80) return 'red';
+      if (pct > 60) return 'orange';
+      if (pct > 40) return 'yellow';
+      if (pct > 20) return 'greenyellow';
+      return 'lightblue';
+    }
+
+    function createCircles() {
+      const game = document.getElementById('game');
+      Array.from(game.children).forEach(child => {
+        if (child.classList.contains('circle')) game.removeChild(child);
+      });
+
+      circles = [];
+      const baseHP = 10n * BigInt(Math.floor(1.7 ** (stage - 1)));
+      for (let i = 0; i < 11; i++) {
+        const hp = baseHP;
+        const div = document.createElement('div');
+        div.className = 'circle';
+        const x = Math.random() * (game.clientWidth - 60);
+        const y = Math.random() * (game.clientHeight - 60);
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+        game.appendChild(div);
+        const circle = { el: div, hp, maxHp: hp, x, y };
+        div.onclick = () => {
+          if (circle.hp > 0n) {
+            const dmg = tapAttack < circle.hp ? tapAttack : circle.hp;
+            circle.hp -= dmg;
+            points += dmg;
+            updateUI();
+            renderCircles();
+            if (circles.every(c => c.hp <= 0n)) {
+              stage++;
+              createCircles();
+            }
+          }
+        };
+        circles.push(circle);
+      }
+      renderCircles();
+    }
+
+    function renderCircles() {
+      circles.forEach(c => {
+        if (c.hp <= 0n) {
+          c.el.style.display = 'none';
+        } else {
+          c.el.style.display = 'flex';
+          c.el.style.background = getColor(c.hp, c.maxHp);
+          c.el.innerHTML = formatBigIntNumber(c.hp);
+        }
+      });
+    }
+
+    const ballTypes = [
+      { color: 'red', attack: 1n, cost: 0n },
+      { color: 'blue', attack: 30n, cost: 0n },
+      { color: 'yellow', attack: 90n, cost: 0n },
+      { color: 'green', attack: 270n, cost: 6000n },
+      { color: 'orange', attack: 810n, cost: 17500n },
+      { color: 'yellowgreen', attack: 2000n, cost: 35000n },
+      { color: 'gray', attack: 10000n, cost: 80000n },
+      { color: 'lightblue', attack: 50000n, cost: 160000n },
+      { color: 'purple', attack: 100000n, cost: 1020000n },
+      { color: 'pink', attack: 530000n, cost: 11830000n },
+      { color: 'black', attack: 995000n, cost: 73000000n },
+      { color: 'brown', attack: 1900000n, cost: 700000000n },
+{ color: 'greenyellow', attack: 8000000n, cost: 8100000000n },
+{ color: '#F8C3B6', attack: 11000000n, cost: 10000000000n },
+{ color: 'chocolate', attack: 1000000000, cost: 100000000000n },
+{ color: 'springgreen', attack: 50000000000n, cost: 500000000000n },
+{ color: 'royalblue', attack: 100000000000n, cost: 1000000000000n },
+{ color: '#B00000', attack: 345100000000n, cost: 9900000000000n },
+{ color: 'gold', attack: 1850000000000n, cost: 10000000000000n },
+{ color: 'darkpurple', attack: 6050000000000n, cost: 50000000000000n },
+{ color: '#212728', attack: 18500000000000n, cost: 100000000000000n },
+{ color: 'magenta', attack: 78500000000000n, cost: 1000000000000000n },
+{ color: 'darkred', attack: 585000000000000n, cost: 19800000000000000n },
+{ color: 'yellowgreen', attack: 4850000000000000n, cost: 38500000000000000n },
+{ color: '#666666', attack: 38850000000000000n, cost: 200000000000000000n },
+{ color: '#123456', attack: 388500000000000000n, cost: 2000000000000000000n },
+{ color: '#ABCDEF', attack: 3885000000000000000n, cost: 15300000000000000000n },
+{ color: '#A00000', attack: 38850000000000000000n, cost: 553000000000000000000n },
+{ color: '#EEEEEE', attack: 388500000000000000000n, cost: 1530000000000000000000n },
+{ color: '#700129', attack: 3885000000000000000000n, cost: 15300000000000000000000n },
+{ color: '#111111', attack: 38850000000000000000000n, cost: 153000000000000000000000n },
+{ color: '#129999', attack: 388500000000000000000000n, cost: 1530000000000000000000000n },
+{ color: '#D84674', attack: 3885000000000000000000000n, cost: 15300000000000000000000000n },
+{ color: '#1B9570', attack: 39850000000000000000000000n, cost: 193000000000000000000000000n },
+{ color: '#319482', attack: 398500000000000000000000000n, cost: 1930000000000000000000000000n },
+{ color: '#391040', attack: 4985000000000000000000000000n, cost: 20300000000000000000000000000n },
+{ color: 'olive', attack: 49850000000000000000000000000n, cost: 203000000000000000000000000000n },
+{ color: 'indigo', attack: 498500000000000000000000000000n, cost: 9000300000000000000000000000000n },
+{ color: 'aqua', attack: 4000985000000000000000000000000n, cost: 90300000000000000000000000000000n },
+{ color: 'coral', attack: 49850000000000000000000000000000n, cost: 953000000000000000000000000000000n },
+{ color: 'maroon', attack: 498500000000000000000000000000000n, cost: 10300000000000000000000000000000000n },
+{ color: 'darkmagenta', attack: 49850000000000000000000000000000000n, cost: 203000000000000000000000000000000000n },
+{ color: 'darkgray', attack: 498500000000000000000000000000000000n, cost: 2030000000000000000000000000000000000n },
+{ color: 'azure', attack: 4985000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000n },
+{ color: 'beige', attack: 49850000000000000000000000000000000000n, cost: 203000000000000000000000000000000000000n },
+{ color: 'cornsilk', attack: 498500000000000000000000000000000000000n, cost: 2030000000000000000000000000000000000000n },
+{ color: '#FAC8C1', attack: 4985000000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000000n },
+{ color: '#6B7121', attack: 49850000000000000000000000000000000000000n, cost: 203000000000000000000000000000000000000000n },
+{ color: 'lightgreen', attack: 498500000000000000000000000000000000000000n, cost: 2030000000000000000000000000000000000000000n },
+{ color: 'darkgreen', attack: 4985000000000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000000000n }
+];
+
+    function createBall(type) {
+      const game = document.getElementById('game');
+      const div = document.createElement('div');
+      div.className = 'ball';
+      div.style.backgroundColor = type.color;
+      game.appendChild(div);
+      balls.push({
+        el: div,
+        x: Math.random() * (game.clientWidth - 20),
+        y: 0,
+        vx: (Math.random() - 0.5) * 4,
+        vy: 2,
+        attack: type.attack,
+        cost: type.cost,
+        purchased: false,
+        lastHitTime: Date.now()
+      });
+    }
+
+    function renderBallUpgrades() {
+      const container = document.getElementById('ballUpgrades');
+      container.innerHTML = '';
+
+      ballTypes.forEach((ballType, index) => {
+        const btn = document.createElement('button');
+        btn.innerHTML = `${ballType.color} Ball 購入(${formatBigIntNumber(ballType.cost)})`;
+        btn.onclick = () => {
+          if (points >= ballType.cost && !balls[index].purchased) {
+            points -= ballType.cost;
+            balls[index].purchased = true;
+            updateUI();
+            renderBallUpgrades();
+          }
+        };
+        container.appendChild(btn);
+      });
+
+
+
+      balls.forEach((b, i) => {
+        if (b.purchased) {
+          const btn = document.createElement('button');
+          btn.innerHTML = `${ballTypes[i].color} Ball 攻撃:${formatBigIntNumber(b.attack)} 強化(${formatBigIntNumber(b.cost)})`;
+          btn.onclick = () => {
+            if (points >= b.cost) {
+              points -= b.cost;
+              b.attack = (b.attack * ATTACK_NUM + ATTACK_DEN - 1n) / ATTACK_DEN;
+              b.cost = b.cost * COST_NUM / COST_DEN;
+              updateUI();
+              renderBallUpgrades();
+            }
+          };
+          container.appendChild(btn);
+        }
+      });
+
+      renderBallInfo();
+    }
+
+function tupg() {
+
+if (points >= tapCost) {
+
+tapAttack = tapAttack * 108n / 100n + 1n;
+
+points = points - tapCost;
+
+tapCost = tapCost * 17n / 10n;
+
+
+renderBallInfo();
+
+updateUI();
+
+};
+
+
+
+}
+
+function mou() {
+
+let moo = document.getElementById('mo');
+
+moo.innerHTML = "<button onclick='tupd()'>MOD</button>";
+
+}
+
+function tupd() {
+
+tapAttack = tapAttack * 1000n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+    function renderBallInfo() {
+      const info = document.getElementById('ballInfo');
+      info.innerHTML = `<div>タップ攻撃力: ${formatBigIntNumber(tapAttack)}, 次の強化: ${formatBigIntNumber(tapCost)}</div>`;
+      balls.forEach((b, i) => {
+        if (b.purchased) {
+          const div = document.createElement('div');
+          div.innerHTML = `${ballTypes[i].color} Ball: 攻撃力=${formatBigIntNumber(b.attack)}, 次の強化=${formatBigIntNumber(b.cost)}`;
+          info.appendChild(div);
+        }
+      });
+    }
+
+    function updateUI() {
+      document.getElementById('points').innerHTML = formatBigIntNumber(points);
+    }
+
+    function gameLoop() {
+      const now = Date.now();
+      const game = document.getElementById('game');
+      balls.forEach(b => {
+        if (b.purchased) {
+          b.x += b.vx;
+          b.y += b.vy;
+          const w = game.clientWidth, h = game.clientHeight;
+
+          if (b.x < 0 || b.x > w - 20) b.vx *= -1;
+          if (b.y < 0 || b.y > h - 20) b.vy *= -1;
+
+          b.el.style.left = `${b.x}px`;
+          b.el.style.top = `${b.y}px`;
+
+          let hit = false;
+          circles.forEach(c => {
+            if (c.hp > 0n) {
+              const dx = (c.x + 30) - (b.x + 10);
+              const dy = (c.y + 30) - (b.y + 10);
+              const dist = Math.hypot(dx, dy);
+              if (dist < 40) {
+                const dmg = b.attack < c.hp ? b.attack : c.hp;
+                c.hp -= dmg;
+                points += dmg;
+                updateUI();
+                renderCircles();
+                const normalX = dx / dist;
+                const normalY = dy / dist;
+                const dot = b.vx * normalX + b.vy * normalY;
+                b.vx -= 2 * dot * normalX;
+                b.vy -= 2 * dot * normalY;
+                b.lastHitTime = now;
+                hit = true;
+
+                if (circles.every(c => c.hp <= 0n)) {
+                  stage++;
+                  createCircles();
+                }
+              }
+            }
+          });
+
+          // サボり検知：2秒以上攻撃していなければ誘導
+          if (!hit && now - b.lastHitTime > 6000) {
+            const target = circles.find(c => c.hp > 0n);
+            if (target) {
+              const dx = (target.x + 30) - (b.x + 10);
+              const dy = (target.y + 30) - (b.y + 10);
+              const dist = Math.hypot(dx, dy);
+              const speed = 2;
+              b.vx = (dx / dist) * speed;
+              b.vy = (dy / dist) * speed;
+            }
+          }
+        }
+      });
+      requestAnimationFrame(gameLoop);
+    }
+
+    createCircles();
+    ballTypes.forEach(createBall);
+    renderBallUpgrades();
+    updateUI();
+    gameLoop();
+  </script>
+<img src="images/b.png" style="height: 14px; width: 14px;"></img>
+<img src="images/iPhone.jpg" style="height: 14px; width: 14px;"></img>
+ <img src="images/c.png" style="height: 14px; width: 14px;"></img>
+<img src="images/d.png" style="height: 14px; width: 14px;"></img>  
+  <img src="images/e.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/f.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/g.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/h.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/i.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/j.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/k.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/l.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/m.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/jon.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/o.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/p.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/q.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/r.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/s.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/t.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/u.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/v.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/w.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/x.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/y.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/z.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/aa.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ab.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ac.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ad.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ae.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/af.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ag.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ah.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ai.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ak.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/al.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/am.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/an.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ao.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ap.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ar.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/as.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/at.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/au.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/av.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aw.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ax.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ay.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/az.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ba.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bb.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bc.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bd.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/be.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bf.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bg.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bh.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bi.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bk.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bl.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bm.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bn.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/bo.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/bp.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/br.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bs.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bt.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bu.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bv.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bw.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bx.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/by.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bz.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ca.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cb.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cc.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cd.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ce.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cf.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cg.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ch.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ci.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ck.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cl.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cm.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cn.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/co.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cp.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cr.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cs.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/1.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/2.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/3.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/4.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/5.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/6.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/7.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/8.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/悪口.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/9.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/10.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/11.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/12.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/13.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/14.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/15.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/16.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/17.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/18.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/19.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/20.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/papasika.png" style="height: 14px; width: 14px;"></img>
+ 
+</body>
+</html>
