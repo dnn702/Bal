@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    
+    <title>超関数電卓</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background: #f0f0f0;
+            padding: 10px;
+        }
+        .calculator {
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 1200px;
+            width: 100%;
+        }
+        .display {
+            width: 100%;
+            height: 50px;
+            margin-bottom: 10px;
+            font-size: 22px;
+            text-align: right;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            grid-gap: 8px;
+        }
+        button {
+            font-size: 14px;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #ddd;
+        }
+        button.func {
+            background: #d0f0ff;
+        }
+        button.equals {
+            background: #ffd0d0;
+        }
+        button.clear {
+            background: #ffcccc;
+        }
+        .history {
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 8px;
+            background: #fafafa;
+            font-size: 13px;
+        }
+        .history-item {
+            margin-bottom: 5px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator">
+    <input type="text" id="display" class="display">
+<div class="quad-solver">
+        <strong>二次方程式 solver</strong><br>
+        <label>a: <input type="number" id="a" value="1"></label>
+        <label>b: <input type="number" id="b" value="0"></label>
+        <label>c: <input type="number" id="c" value="0"></label>
+        <button onclick="solveQuadratic()">解く</button>
+        <div id="quad-result"></div>
+    </div>
+
+<button onclick="charToUnicode()">文字→Unicode</button>
+<button onclick="unicodeToChar()">Unicode→文字</button>
+
+<button onclick="copyDisplay()">Copy Result</button>
+<button onclick="copyHistory()">Copy History</button>
+<button onclick="clearEntry()">CE</button>
+<button onclick="calcIncludingTax()">税込</button>
+<button onclick="calcExcludingTax()">税抜</button>
+<button onclick="setTaxRate()">税率設定</button>
+    <div class="buttons">
+        <div class="buttons">
+        <button onclick="append('7')">7</button>
+        <button onclick="append('8')">8</button>
+        <button onclick="append('9')">9</button>
+        <button onclick="clearDisplay()" class="clear">AC</button>
+</div>
+<div class="buttons">
+
+        <button onclick="append('4')">4</button>
+        <button onclick="append('5')">5</button>
+        <button onclick="append('6')">6</button>
+        <button onclick="backspace()">⌫</button>
+</div><div class="buttons">
+
+        <button onclick="append('1')">1</button>
+        <button onclick="append('2')">2</button>
+        <button onclick="append('3')">3</button>
+        <button onclick="append('+')">+</button>
+</div><div class="buttons">
+
+        <button onclick="append('0')">0</button>
+        <button onclick="append('.')">.</button>
+        <button onclick="calculate()" class="equals">=</button>
+        <button onclick="append('-')">-</button>
+</div>
+
+        <button onclick="append('*')">×</button>
+        <button onclick="append('/')">÷</button>
+             <button onclick="append('/100')">%</button>
+
+        <button onclick="append('(')">(</button>
+        <button onclick="append(')')">)</button>
+
+        <button onclick="append('{')">{</button>
+        <button onclick="append('}')">}</button>
+        <button onclick="append('[')">[</button>
+        <button onclick="append(']')">]</button>
+          <button onclick="append('《')">《</button>
+        <button onclick="append('》')">》</button>
+  <button onclick="append('〔')">〔   </button>
+        <button onclick="append('〕')">   〕</button>
+  <button onclick="append('<')"><</button>
+        <button onclick="append('>')">></button>
+  <button onclick="append('【')">【</button>
+        <button onclick="append('】')">】</button>
+  <button onclick="append('〈')">〈</button>
+        <button onclick="append('〉')">〉</button>
+  <button onclick="append('〚')">〚</button>
+        <button onclick="append('〛')">〛</button>
+  <button onclick="append('〘')">〘</button>
+        <button onclick="append('〙')">〙</button>
+          <button onclick="append('﴾')">﴾</button>
+        <button onclick="append('﴿')">﴿</button>
+  <button onclick="append('❪')">❪</button>
+        <button onclick="append('❫')">❫</button>
+  <button onclick="append('❨')">❨</button>
+        <button onclick="append('❩')">❩</button>
+  <button onclick="append('⦅')">⦅</button>
+        <button onclick="append('⦆')">⦆</button>
+  <button onclick="append('⸨')">⸨</button>
+        <button onclick="append('⸩')">⸩</button>
+  <button onclick="append('❴')">❴</button>
+        <button onclick="append('❵')">❵</button>
+  <button onclick="append('⟦')">⟦</button>
+        <button onclick="append('⟧')">⟧</button>
+  <button onclick="append('❲')">❲</button>
+        <button onclick="append('❳')">❳</button>
+  <button onclick="append('⟮')">⟮</button>
+        <button onclick="append('⟯')">⟯</button>
+  <button onclick="append('⟬')">⟬</button>
+        <button onclick="append('⟭')">⟭</button>
+  <button onclick="append('❬')">❬</button>
+        <button onclick="append('❭')">❭</button>
+  <button onclick="append('❰')">❰</button>
+        <button onclick="append('❱')">❱</button>
+  <button onclick="append('⧼')">⧼</button>
+        <button onclick="append('⧽')">⧽</button>
+  <button onclick="append('⟨')">⟨</button>
+        <button onclick="append('⟩')">⟩</button>
+  <button onclick="append('⟪')">⟪</button>
+        <button onclick="append('⟫')">⟫</button>
+
+  <button onclick="append('⦑')">⦑</button>
+        <button onclick="append('⦒')">⦒</button>
+
+  <button onclick="append('DD')">M</button>
+        <button onclick="append('ↁ')">ↁ</button>
+  <button onclick="append('ↂ')">ↂ</button>
+        <button onclick="append('Million')">1Mil</button>
+  <button onclick="append('Z')">1Z</button>
+        <button onclick="append('Zc50')">Zc50</button>
+<button onclick="append('dm')">dm</button>
+<button onclick="append('◘')">◘</button>
+<button onclick="append('◙')">◙</button>
+<button onclick="append('✤')">✤</button>
+<button onclick="append('/8')">x/8</button>
+<button onclick="append('≠')">≠</button>
+
+        <button onclick="append(',')" class="func">,</button>
+ <button onclick="append('Math.pow(')">^</button>
+
+     <button onclick="append('00')">00</button>
+     <button onclick="append('000')">000</button>
+     <button onclick="append('0000')">0000</button>
+<button onclick="append('＞')">＞</button>
+<button onclick="append('＜')">＜</button>
+<button onclick="append('≧')">≧</button>
+<button onclick="append('≦')">≦</button>
+<button onclick="append('≮')">≮</button>
+<button onclick="append('≯')">≯</button>
+
+<button onclick="append('≈')">≈</button>
+<button onclick="append('≒')">≒</button>
+<button onclick="append('≡')">≡</button>
+<button onclick="append('≃')">≃</button>
+<!-- そのまま入力用 -->
+<button onclick="append('?')">?</button>
+<button onclick="append('&')">&</button>
+<button onclick="append('&&')">&&</button>
+<button onclick="append('true')">true</button>
+<button onclick="append('false')">false</button>
+
+
+<!-- そのまま入力用 -->
+<button onclick="append(':')">:</button>
+
+        <button onclick="append('Math.sqrt(')">√</button>
+        <button onclick="append('log(')" class="func">log</button>
+        <button onclick="append('log2(')" class="func">log2</button>
+        <button onclick="append('log3(')" class="func">log3</button>
+
+        <button onclick="append('log10(')" class="func">log10</button>
+        <button onclick="append('log20(')" class="func">log20</button>
+        <button onclick="append('ln(')" class="func">ln</button>
+        <button onclick="append('ln2(')" class="func">ln2</button>
+
+        <button onclick="append('ln10(')" class="func">ln10</button>
+        <button onclick="append('rand()')" class="func">rand</button>
+        <button onclick="append('Math.PI')">π</button>
+        <button onclick="append('Math.E')">e</button>
+
+        <button onclick="append('Math.sin(')" class="func">sin</button>
+        <button onclick="append('Math.cos(')" class="func">cos</button>
+        <button onclick="append('Math.tan(')" class="func">tan</button>
+        <button onclick="append('Math.asin(')" class="func">asin</button>
+
+        <button onclick="append('Math.acos(')" class="func">acos</button>
+        <button onclick="append('Math.atan(')" class="func">atan</button>
+        <button onclick="append('sinh(')" class="func">sinh</button>
+        <button onclick="append('cosh(')" class="func">cosh</button>
+
+        <button onclick="append('tanh(')" class="func">tanh</button>
+        <button onclick="append('asinh(')" class="func">asinh</button>
+        <button onclick="append('acosh(')" class="func">acosh</button>
+        <button onclick="append('atanh(')" class="func">atanh</button>
+
+        <button onclick="append('sec(')" class="func">sec</button>
+        <button onclick="append('asec(')" class="func">asec</button>
+        <button onclick="append('sech(')" class="func">sech</button>
+        <button onclick="append('asech(')" class="func">asech</button>
+
+        <button onclick="append('cot(')" class="func">cot</button>
+        <button onclick="append('acot(')" class="func">acot</button>
+        <button onclick="append('coth(')" class="func">coth</button>
+        <button onclick="append('acoth(')" class="func">acoth</button>
+
+        <button onclick="append('cosec(')" class="func">cosec</button>
+        <button onclick="append('acosec(')" class="func">acosec</button>
+        <button onclick="append('cosech(')" class="func">cosech</button>
+        <button onclick="append('acosech(')" class="func">acosech</button>
+        <button onclick="append('*Math.PI')">xπ</button>
+<button onclick="append('*(2*Math.PI)')">xτ</button>
+     <button onclick="append('(2*Math.PI)')">τ</button>
+ <button onclick="append('(3*Math.PI)')">3π</button>
+ <button onclick="append('(4*Math.PI)')">4π</button>
+ <button onclick="append('(5*Math.PI)')">5π</button>
+ <button onclick="append('Math.pow(10,')">10^x</button>
+
+<button onclick="append('e')">EE</button> <!-- または 10** -->
+<!-- 数学系 -->
+<button onclick="append('Math.floor(')">floor</button>
+<button onclick="append('Math.ceil(')">ceil</button>
+<button onclick="append('Math.abs(')">abs</button>
+<button onclick="append('Math.min(')">min</button>
+<button onclick="append('Math.max(')">max</button>
+<button onclick="append(' % ')">mod</button>
+<button onclick="append('Math.imul(')">imul</button>
+<button onclick="append('Math.clz32(')">clz32</button>
+<button onclick="calcNCR()">nCr</button>
+<button onclick="calcNPR()">nPr</button>
+<!-- e^x -->
+<button onclick="append('Math.exp(')">e^x</button>
+<button onclick="append('xm(')" class="func">1-x</button>
+<button onclick="append('xpr(')" class="func">1+x</button>
+<button onclick="append('xw(')" class="func">1/x</button>
+<button onclick="append('swn(')" class="func">x/y</button>
+<button onclick="append('(1/')" class="func">簡易1/x</button>
+<button onclick="calcFactorial()">x!</button>
+
+<!-- atan2(y,x) -->
+<button onclick="append('Math.atan2(')">atan2(y,x)</button>
+
+<!-- expm1 -->
+<button onclick="append('Math.expm1(')">expm1</button>
+
+<!-- log25, log150, log15 （カスタムはテンプレとして入れる）-->
+<button onclick="append('(Math.log(25)/Math.log(')">log25</button>
+<button onclick="append('(Math.log(150)/Math.log(')">log150</button>
+<button onclick="append('(Math.log(15)/Math.log(')">log15</button>
+     <button onclick="append('Infinity')">Infinity</button>
+     <button onclick="append('-Infinity')">-Infinity</button>
+     <button onclick="append('NaN')">NaN</button>
+<button onclick="calcLogBase()">logb</button>
+<!-- hypot -->
+<button onclick="append('Math.hypot(')">hypot(x,y)</button>
+
+<!-- メモリ機能 -->
+<button onclick="memoryAdd()">M+</button>
+<button onclick="memorySubtract()">M-</button>
+<button onclick="memoryRecall()">MR</button>
+<button onclick="memoryClear()">MC</button>
+
+
+    </div>
+    
+    <div class="buttons">
+        <b>int = trunc</b>
+        <button onclick="calcInt()">int</button>
+        <button onclick="append('Math.trunc(')">trunc</button>
+         <button onclick="append('Math.trunc(')">切り捨て</button>
+  <button onclick="append('Math.ceil(')">切り上げ</button>
+  <button onclick="append('3')">truncπ</button>
+  <button onclick="append('3')">floorπ</button>
+  <button onclick="append('4')">ceilπ</button>
+  <button onclick="append('3.14')">簡易π</button>
+  <button onclick="append('((Math.PI)/2)')">1/2π</button>
+  <button onclick="append('((Math.PI)/3)')">1/3π</button>
+  <button onclick="append('((Math.PI)/4)')">1/4π</button>
+  <button onclick="append('bun(')">分数</button>
+  <button onclick="append('mbun(')">-分数</button>
+
+    </div>
+    
+    <div class="buttons">
+  <button onclick="append('0x')">Hex</button>
+  <button onclick="append('A')">A</button>
+  <button onclick="append('B')">B</button>
+  <button onclick="append('C')">C</button>
+  <button onclick="append('D')">D</button>
+  <button onclick="append('E')">E</button>
+  <button onclick="append('F')">F</button>
+  <button onclick="append('0x')">0x</button>
+</div>
+
+<button onclick="calcTelegraphEq()">電信方程式</button>
+<button onclick="calcWaveEq()">波動方程式</button>
+
+<button onclick="calcBoltzmannEq()">ボルツマン方程式</button>
+<button onclick="calcEinsteinEq()">アインシュタイン方程式</button>
+<button onclick="evalFunction()">F(x)</button>
+
+    <div class="history" id="history">
+        <strong>履歴</strong>
+    </div>
+</div>
+
+<script>
+    function append(value) {
+        document.getElementById('display').value += value;
+    }
+
+    function clearDisplay() {
+        document.getElementById('display').value = '';
+    }
+
+    function backspace() {
+        const display = document.getElementById('display');
+        display.value = display.value.slice(0, -1);
+    }
+
+    function calculateda() {
+        const display = document.getElementById('display');
+        
+        const safeInput = preprocessInput(display)
+        try {
+            const result = eval(display.value);
+            addHistory(display.value + ' = ' + result);
+            display.value = result;
+        } catch (e) {
+            display.value = 'あ、やらかした';
+        }
+    }
+
+
+
+    function addHistory(entry) {
+        const history = document.getElementById('history');
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.textContent = entry;
+        history.appendChild(div);
+        history.scrollTop = history.scrollHeight;
+    }
+
+    // 追加関数定義
+    function sinh(x) { return (Math.exp(x) - Math.exp(-x)) / 2; }
+    function cosh(x) { return (Math.exp(x) + Math.exp(-x)) / 2; }
+    function tanh(x) { return sinh(x) / cosh(x); }
+    function asinh(x) { return Math.log(x + Math.sqrt(x*x + 1)); }
+    function acosh(x) { return Math.log(x + Math.sqrt(x*x - 1)); }
+    function atanh(x) { return 0.5 * Math.log((1 + x) / (1 - x)); }
+
+    function sec(x) { return 1 / Math.cos(x); }
+    function asec(x) { return Math.acos(1 / x); }
+    function sech(x) { return 1 / cosh(x); }
+    function asech(x) { return Math.log((1 + Math.sqrt(1 - x*x)) / x); }
+
+    function cot(x) { return 1 / Math.tan(x); }
+    function acot(x) { return Math.atan(1 / x); }
+    function coth(x) { return 1 / tanh(x); }
+    function acoth(x) { return 0.5 * Math.log((x + 1) / (x - 1)); }
+
+    function cosec(x) { return 1 / Math.sin(x); }
+    function acosec(x) { return Math.asin(1 / x); }
+    function cosech(x) { return 1 / sinh(x); }
+    function acosech(x) { return Math.log((1 + Math.sqrt(1 + x*x)) / x); }
+
+    function rand() { return Math.random(); }
+
+    function log(x) { return Math.log10(x); }
+    function log2(x) { return Math.log(x) / Math.log(2); }
+    function log3(x) { return Math.log(x) / Math.log(3); }
+    function log10(x) { return Math.log10(x); }
+    function log20(x) { return Math.log(x) / Math.log(20); }
+
+    function ln(x) { return Math.log(x); }
+    function ln2(x) { return Math.log(2); }
+    function ln10(x) { return Math.log(10); }
+    function xm(x) { return 1 - x; }
+    function xpr(x) { return 1 + x; }
+function xw(x) { return 1 / x; }
+function nc(x,y) { return x / y; }
+function swn(x,y) { return x / y; }
+function swn(x,y) { return x / y; }
+function swn(x,y) { return x / y; }
+function swn(x,y) { return x / y; }
+function swn(x,y) { return x / y; }
+function bun(x,y) { return x / y}
+function mbun(x,y) { return -(x / y)}
+    function solveQuadratic() {
+  const a = parseFloat(document.getElementById('a').value);
+  const b = parseFloat(document.getElementById('b').value);
+  const c = parseFloat(document.getElementById('c').value);
+  
+  const discriminant = b * b - 4 * a * c;
+  let resultText = '';
+  
+  if (a === 0) {
+    resultText = 'a=0 は二次式になりません';
+  } else if (discriminant > 0) {
+    const x1 = (-b + Math.sqrt(discriminant)) / (2 * a);
+    const x2 = (-b - Math.sqrt(discriminant)) / (2 * a);
+    resultText = `Xa = ${x1.toFixed(5)}, Xb = ${x2.toFixed(5)}`;
+  } else if (discriminant === 0) {
+    const x = -b / (2 * a);
+    resultText = `Xa = Xb = ${x.toFixed(5)}`;
+  } else {
+    const real = -b / (2 * a);
+    const imag = Math.sqrt(-discriminant) / (2 * a);
+    resultText = `Xa = ${real.toFixed(5)} + ${imag.toFixed(5)}i, Xb = ${real.toFixed(5)} - ${imag.toFixed(5)}i`;
+  }
+  
+  document.getElementById('quad-result').innerText = resultText;
+  addHistory(`二次式: ${a}x² + ${b}x + ${c} = 0 → ${resultText}`);
+}
+
+
+function charToUnicode() {
+  const input = prompt("文字列を入力してください:");
+  if (input) {
+    let result = '';
+    for (let i = 0; i < input.length; i++) {
+      const code = input.charCodeAt(i).toString(16).toUpperCase();
+      result += 'U+' + code.padStart(4, '0') + ' ';
+    }
+    result = result.trim();
+    document.getElementById('display').value = result;
+    addHistory(`'${input}' → ${result}`);
+  }
+}
+
+function unicodeToChar() {
+  const input = prompt("16進コードを空白区切りで入力（例: 3042 3044 3046）:");
+  if (input) {
+    const codes = input.trim().split(/\s+/);
+    let result = '';
+    for (let code of codes) {
+      result += String.fromCharCode(parseInt(code, 16));
+    }
+    document.getElementById('display').value = result;
+    addHistory(`U+${codes.join(' U+')} → '${result}'`);
+  }
+}
+
+function copyDisplay() {
+    const display = document.getElementById('display');
+    navigator.clipboard.writeText(display.value);
+    alert('結果をコピーしました');
+}
+
+function copyHistory() {
+    const history = Array.from(document.querySelectorAll('.history-item'))
+        .map(item => item.textContent).join('\n');
+    navigator.clipboard.writeText(history);
+    alert('履歴をコピーしました');
+}
+
+function insertPi() {
+    append(Math.PI.toString());
+}
+function insertTau() {
+    append((2 * Math.PI).toString());
+}
+function insert3Pi() {
+    append((3 * Math.PI).toString());
+}
+
+function factorial(n) {
+    if (n < 0) return NaN;
+    if (n === 0) return 1;
+    return n * factorial(n - 1);
+}
+
+function calcNCR() {
+    const input = prompt("nCr 入力 (例: 5,3)");
+    if (input) {
+        const [n, r] = input.split(',').map(Number);
+        const result = factorial(n) / (factorial(r) * factorial(n - r));
+        document.getElementById('display').value = result;
+        addHistory(`${n}C${r} = ${result}`);
+    }
+}
+
+function calcNPR() {
+    const input = prompt("nPr 入力 (例: 5,3)");
+    if (input) {
+        const [n, r] = input.split(',').map(Number);
+        const result = factorial(n) / factorial(n - r);
+        document.getElementById('display').value = result;
+        addHistory(`${n}P${r} = ${result}`);
+    }
+}
+
+let memory = 0;
+
+function memoryAdd() {
+    const display = document.getElementById('display');
+    memory += parseFloat(display.value) || 0;
+    addHistory(`M+ ${display.value}`);
+}
+
+function memorySubtract() {
+    const display = document.getElementById('display');
+    memory -= parseFloat(display.value) || 0;
+    addHistory(`M- ${display.value}`);
+}
+
+function memoryRecall() {
+    document.getElementById('display').value = memory;
+    addHistory(`MR = ${memory}`);
+}
+
+function memoryClear() {
+    memory = 0;
+    addHistory(`MC`);
+}
+
+
+function calcTelegraphEq() {
+    const V0 = parseFloat(prompt("V0 (初期電圧) を入力してください:"));
+    const alpha = parseFloat(prompt("α (減衰定数) を入力してください:"));
+    const beta = parseFloat(prompt("β (位相定数) を入力してください:"));
+    const omega = parseFloat(prompt("ω (角周波数) を入力してください:"));
+    const x = parseFloat(prompt("x (位置) を入力してください:"));
+    const t = parseFloat(prompt("t (時間) を入力してください:"));
+    
+    const result = V0 * Math.exp(-alpha * x) * Math.cos(omega * t - beta * x);
+    
+    document.getElementById('display').value = result;
+    addHistory(`電信方程式 V(x=${x},t=${t}) = ${result}`);
+}
+
+function calcWaveEq() {
+    const A = parseFloat(prompt("A (振幅) を入力してください:"));
+    const k = parseFloat(prompt("k (波数) を入力してください:"));
+    const omega = parseFloat(prompt("ω (角周波数) を入力してください:"));
+    const x = parseFloat(prompt("x (位置) を入力してください:"));
+    const t = parseFloat(prompt("t (時間) を入力してください:"));
+    
+    const result = A * Math.sin(k * x - omega * t);
+    
+    document.getElementById('display').value = result;
+    addHistory(`波動方程式 u(x=${x},t=${t}) = ${result}`);
+}
+
+function calcBoltzmannEq() {
+    const E = parseFloat(prompt("E (エネルギー J) を入力してください:"));
+    const T = parseFloat(prompt("T (温度 K) を入力してください:"));
+    const A = parseFloat(prompt("A (定数係数, 通常1) を入力してください:", "1"));
+    const kB = 1.380649e-23;
+    
+    const result = A * Math.exp(-E / (kB * T));
+    
+    document.getElementById('display').value = result;
+    addHistory(`ボルツマン: E=${E}, T=${T} → f(E)=${result}`);
+}function calcEinsteinEq() {
+    const m = parseFloat(prompt("m (質量 kg) を入力してください:"));
+    const c = 299792458; // 光速 (m/s)
+    
+    const result = m * c * c;
+    
+    document.getElementById('display').value = result;
+    addHistory(`アインシュタイン: m=${m} → E=${result} J`);
+}
+
+function calcFactorial() {
+    const x = parseFloat(document.getElementById('display').value);
+    if (x < 0 || !Number.isInteger(x)) {
+        document.getElementById('display').value = 'Error';
+        return;
+    }
+    let result = 1;
+    for (let i = 1; i <= x; i++) {
+        result *= i;
+    }
+    document.getElementById('display').value = result;
+    addHistory(`${x}! = ${result}`);
+}
+
+function calcLogBase() {
+    const x = parseFloat(prompt("x を入力してください（log_b(x) の x）:"));
+    const b = parseFloat(prompt("b を入力してください（底 b）:"));
+
+    if (x <= 0 || b <= 0 || b === 1) {
+        alert("x > 0, b > 0 かつ b ≠ 1 を満たす必要があります");
+        return;
+    }
+
+    const result = Math.log(x) / Math.log(b);
+
+    document.getElementById('display').value = result;
+    addHistory(`log base ${b} of ${x} = ${result}`);
+}
+
+let taxRate = 0.10; // 初期値：10%
+
+function clearEntry() {
+    document.getElementById('display').value = '';
+}
+
+function setTaxRate() {
+    const input = prompt("税率（％）を入力してください（例：10）");
+    const value = parseFloat(input);
+    if (!isNaN(value) && value >= 0) {
+        taxRate = value / 100;
+        addHistory(`税率設定: ${value}%`);
+    } else {
+        alert("有効な数値を入力してください");
+    }
+}
+
+function calcIncludingTax() {
+    const x = parseFloat(document.getElementById('display').value);
+    const result = x * (1 + taxRate);
+    document.getElementById('display').value = result;
+    addHistory(`${x} の税込（${(taxRate * 100)}%）= ${result}`);
+}
+
+function calcExcludingTax() {
+    const x = parseFloat(document.getElementById('display').value);
+    const result = x / (1 + taxRate);
+    document.getElementById('display').value = result;
+    addHistory(`${x} の税抜（${(taxRate * 100)}%）= ${result}`);
+}
+
+function calcInt() {
+    const x = parseFloat(document.getElementById('display').value);
+    const result = Math.trunc(x); // 小数点以下を切り捨て（正負どちらにも対応）
+    document.getElementById('display').value = result;
+    addHistory(`int(${x}) = ${result}`);
+}
+
+function evalFunction() {
+    const fx = prompt("関数 F(x) を入力してください（例: x*x + 3*x + 2）:");
+    if (!fx) return;
+
+    const x = parseFloat(prompt("x の値を入力してください:"));
+    if (isNaN(x)) {
+        alert("x に数値を入れてください");
+        return;
+    }
+
+    try {
+        const result = Function("x", "return " + fx)(x);
+        document.getElementById('display').value = result;
+        addHistory(`F(x) = ${fx}, x = ${x} → ${result}`);
+    } catch (e) {
+        alert("数式が無効です");
+    }
+}
+
+function preprocessInput(expr) {
+    return expr
+        .replace(/《/g, '(')
+        .replace(/》/g, ')')
+        .replace(/〔/g, '(')
+        .replace(/〕/g, ')')
+        .replace(/（/g, '(')
+        .replace(/）/g, ')')
+        .replace(/</g, '(')
+        .replace(/>/g, ')')
+        .replace(/{/g, '(')
+        .replace(/}/g, ')')
+        .replace(/［/g, '[')
+        .replace(/］/g, ']')
+        .replace(/【/g, '(')
+        .replace(/】/g, ')')
+        .replace(/〚/g, '(')
+        .replace(/〛/g, ')')
+        .replace(/〈/g, '(')
+        .replace(/〉/g, ')')
+        .replace(/〘/g, '(')
+        .replace(/〙/g, ')')
+        .replace(/DD/g, '*1000')
+        .replace(/ↁ/g, '*5000')
+        .replace(/ↂ/g, '*10000')
+        .replace(/Zc50/g, '*172.1128372')
+        .replace(/Z/g, '*1e26')
+        .replace(/Million/g, '*1e6')
+        .replace(/﴾/g, '(')
+        .replace(/﴿/g, ')')
+        .replace(/❪/g, '(')
+        .replace(/❫/g, ')')
+        .replace(/❨/g, '(')
+        .replace(/❩/g, ')')
+        .replace(/⦅/g, '(')
+        .replace(/⦆/g, ')')
+        .replace(/⸨/g, '(')
+        .replace(/⸩/g, ')')
+        .replace(/❴/g, '(')
+        .replace(/❵/g, ')')
+        .replace(/⟦/g, '(')
+        .replace(/⟧/g, ')')
+        .replace(/❲/g, '(')
+        .replace(/❳/g, ')')
+        .replace(/⟮/g, '(')
+        .replace(/⟯/g, ')')
+        .replace(/⟬/g, '(')
+        .replace(/⟭/g, ')')
+        .replace(/❬/g, '(')
+        .replace(/❭/g, ')')
+        .replace(/❰/g, '(')
+        .replace(/❱/g, ')')
+        .replace(/⧼/g, '(')
+        .replace(/⧽/g, ')')
+        .replace(/⟨/g, '(')
+        .replace(/⟩/g, ')')
+        .replace(/⟪/g, '(')
+        .replace(/⟫/g, ')')
+        .replace(/⦑/g, '(')
+        .replace(/⦒/g, ')')
+        .replace(/dm/g, '*11.1836283')
+        .replace(/◘/g, '*12828.246931389')
+        .replace(/◙/g, '*284737.1111148')
+        .replace(/✤/g, '*((Math.E)*11.337*(Math.PI))')
+        .replace(/≠/g, '!=')
+        .replace(/≧/g, '>=')
+        .replace(/≦/g, '<=')
+        .replace(/＞/g, '>')
+        .replace(/＜/g, '<')
+        .replace(/≮/g, '>=')
+        .replace(/≯/g, '<=')
+        .replace(/([^\s]+)\s*≈\s*([^\s]+)/g, 'Math.abs($1 - $2) < 1e-9')
+        .replace(/([^\s]+)\s*≒\s*([^\s]+)/g, 'Math.abs($1 - $2) < 1e-9')
+        .replace(/≡/g, '===')
+        .replace(/([^\s]+)\s*≃\s*([^\s]+)/g, 'Math.abs($1 - $2) < 1e-9')
+        .replace(/:/g, '/')
+        
+}
+
+function calculate() {
+    const display = document.getElementById('display');
+
+    const safeInput = preprocessInput(display.value);  // ← 修正ここ！
+    try {
+        const result = eval(safeInput);                // ← 変換後を評価
+        addHistory(display.value + ' = ' + result);    // 入力式はそのまま表示
+        display.value = result;
+    } catch (e) {
+        display.value = 'あ、やらかした';
+    }
+}
+
+</script>
+
+</body>
+</html>
