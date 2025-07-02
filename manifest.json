@@ -1,20 +1,3 @@
 {
-  "name": "Idle balls MOD",
-  "short_name": "Idle Balls",
-  "start_url": "./bmx.html",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2196f3",
-  "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "images/c.png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/d.png"
-    }
-  ]
+	"display": "standalone"
 }
