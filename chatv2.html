@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Firebase Chat (Simple)</title>
+  <style>
+    /* --- simple layout --- */
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa8bf}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,'Noto Sans JP',sans-serif;background:linear-gradient(180deg,#071025 0%, #0b1726 100%);color:#e6f0ff}
+    .app{display:flex;height:100vh;gap:16px;padding:16px;box-sizing:border-box}
+    .sidebar{width:320px;background:rgba(255,255,255,0.02);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:12px}
+    .main{flex:1;display:flex;flex-direction:column;background:rgba(255,255,255,0.02);border-radius:12px;padding:12px}
+    header{display:flex;align-items:center;gap:8px}
+    .messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+    .msg{padding:8px;border-radius:8px;max-width:70%;word-break:break-word}
+    .own{align-self:flex-end;background:rgba(60,120,255,0.12)}
+    .other{align-self:flex-start;background:rgba(255,255,255,0.03)}
+    .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    .input-row{display:flex;gap:8px;padding-top:8px}
+    textarea{flex:1;min-height:48px;max-height:160px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#2b6ef6;color:white;cursor:pointer}
+
+    .attachments{display:flex;gap:8px;flex-wrap:wrap}
+    .attach-preview{width:100px;height:70px;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#071022;border:1px solid rgba(255,255,255,0.02)}
+    .emoji-list{display:flex;gap:6px;flex-wrap:wrap}
+    .emoji-item{width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .small{font-size:13px;color:var(--muted)}
+    .file-input{display:none}
+    .msg .content img.emoji-inline{width:20px;height:20px;vertical-align:middle}
+    .delete-btn{background:transparent;border:0;color:#ff7b7b;cursor:pointer}
+
+    .emoji-manager{display:flex;flex-direction:column;gap:8px}
+    .emoji-row{display:flex;gap:8px;align-items:center}
+    .emoji-preview{width:36px;height:36px;border-radius:6px;overflow:hidden}
+
+    footer.small{font-size:12px;color:var(--muted);text-align:center;padding-top:8px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header>
+        <div style="flex:1">
+          <strong>Firebase Chat</strong>
+          <div class="small" id="userInfo">Not signed in</div>
+        </div>
+      </header>
+
+      <div>
+        <label class="small">Display name:</label>
+        <input id="displayNameInput" placeholder="your name" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="setNameBtn">Set name</button>
+          <button id="signOutBtn">Sign out</button>
+        </div>
+      </div>
+
+      <div class="emoji-manager">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Custom Emojis</strong>
+          <small class="small">use :shortcode: in message</small>
+        </div>
+        <div class="emoji-row">
+          <input type="text" id="emojiShortcode" placeholder=":sushi:" style="flex:1;padding:8px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit" />
+          <label class="button-like" style="background:#2b6ef6;padding:8px 12px;border-radius:6px;cursor:pointer">
+            <input type="file" id="emojiFile" accept="image/*" class="file-input">Upload
+          </label>
+          <button id="addEmojiBtn">Add</button>
+        </div>
+        <div id="emojiList" class="emoji-list small"></div>
+      </div>
+
+      <div style="margin-top:auto">
+        <div class="small">Instructions</div>
+        <ul class="small">
+          <li>Enable Firestore, Storage and Anonymous Auth in your Firebase project</li>
+          <li>Replace <code>firebaseConfig</code> in the HTML with your config</li>
+          <li>Shortcodes like <code>:sushi:</code> will be replaced with images</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Room: global</strong>
+        <div class="small" id="status">Connecting...</div>
+      </header>
+
+      <div id="messages" class="messages"></div>
+
+      <div class="input-row">
+        <div style="flex:1;display:flex;flex-direction:column">
+          <textarea id="messageInput" placeholder="Type a message — use emojis like 😄 or :myemoji:"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <div class="controls">
+              <label style="cursor:pointer">
+                <input type="file" id="fileInput" class="file-input" accept="image/*,video/*">Attach
+              </label>
+              <button id="insertEmojiBtn">Insert emoji</button>
+              <div class="small" id="attachPreview"></div>
+            </div>
+            <div>
+              <button id="sendBtn">Send</button>
+              <div style="margin-top:8px">
+  <label class="small">Text color:</label>
+  <input type="color" id="colorPicker" value="#e6f0ff" style="width:100%;height:32px;border:0;background:transparent;cursor:pointer">
+</div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="small">This is a starter example. You must set up Firebase and security rules before production use.</footer>
+    </main>
+  </div>
+
+  <!-- Firebase - compat CDN (replace versions as you like) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-storage.js";
+
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA-iHMmmCTZvRSXY5pbOAI2Xi3mcGfYXZY",
+  authDomain: "chat-kumie.firebaseapp.com",
+  projectId: "chat-kumie",
+  storageBucket: "chat-kumie.firebasestorage.app",
+  messagingSenderId: "783444107187",
+  appId: "1:783444107187:web:107ad3e9f02a36f06735c6",
+  measurementId: "G-KX6W395M6W"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// ここから先は v12 モジュール用に書き換える必要があります
+</script>
+
+  
+  
+  <script>
+  
+  
+    // ----- CONFIG: put your Firebase config here -----
+    
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+ 
+    
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+
+ const firebaseConfig = {
+  apiKey: "AIzaSyA-iHMmmCTZvRSXY5pbOAI2Xi3mcGfYXZY",
+  authDomain: "chat-kumie.firebaseapp.com",
+  projectId: "chat-kumie",
+  storageBucket: "chat-kumie.firebasestorage.app",
+  messagingSenderId: "783444107187",
+  appId: "1:783444107187:web:107ad3e9f02a36f06735c6",
+  measurementId: "G-KX6W395M6W"
+};
+ 
+      // -------------------------------------------------
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // DOM
+    const messagesEl = document.getElementById('messages');
+    const statusEl = document.getElementById('status');
+    const userInfoEl = document.getElementById('userInfo');
+    const displayNameInput = document.getElementById('displayNameInput');
+    const setNameBtn = document.getElementById('setNameBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
+    const attachPreview = document.getElementById('attachPreview');
+    const emojiListEl = document.getElementById('emojiList');
+    const emojiShortcodeInput = document.getElementById('emojiShortcode');
+    const emojiFileInput = document.getElementById('emojiFile');
+    const addEmojiBtn = document.getElementById('addEmojiBtn');
+
+    let currentUID = null;
+    let currentDisplayName = null;
+    let pendingAttachment = null; // {file, type}
+    const customEmojis = {
+  ":stone:": { url: "images/emojis/dame.png" },
+  ":heart:": { url: "images/emojis/heart.png" },
+  ":smile:": { url: "images/emojis/smile.png" }
+};
+// shortcode -> {url}
+
+    // --- Auth: anonymous sign-in and restore display name from localStorage ---
+    async function initAuth(){
+      auth.onAuthStateChanged(async user => {
+        if(user){
+          currentUID = user.uid;
+          // get stored displayName (we keep it in Firestore "users" doc for persistence but also localStorage)
+          currentDisplayName = localStorage.getItem('displayName') || user.displayName || ('user-' + user.uid.slice(0,6));
+          userInfoEl.textContent = currentDisplayName + ' (' + currentUID.slice(0,6) + ')';
+          displayNameInput.value = currentDisplayName;
+          statusEl.textContent = 'Connected';
+          listenMessages();
+          loadCustomEmojis();
+        } else {
+          // sign in anonymously
+          try{
+            await auth.signInAnonymously();
+          }catch(e){
+            console.error('auth error',e);
+            statusEl.textContent = 'Auth error';
+          }
+        }
+      });
+    }
+
+    setNameBtn.addEventListener('click', async ()=>{
+      const name = displayNameInput.value.trim();
+      if(!name) return alert('Enter a name');
+      currentDisplayName = name;
+      localStorage.setItem('displayName', name);
+      userInfoEl.textContent = currentDisplayName + ' (' + (currentUID?currentUID.slice(0,6):'---') + ')';
+      // optional: write to users collection
+      if(currentUID) await db.collection('users').doc(currentUID).set({displayName: name},{merge:true});
+    });
+    signOutBtn.addEventListener('click', ()=>{
+      if(confirm('Sign out (this will create a new anonymous ID next time)?')){
+        localStorage.removeItem('displayName');
+        auth.signOut();
+      }
+    });
+
+    // --- Send message ---
+    sendBtn.addEventListener('click', async ()=>{
+      const text = messageInput.value.trim();
+      if(!text && !pendingAttachment) return;
+      sendBtn.disabled = true;
+      try{
+        const docRef = await db.collection('messages').add({
+          uid: currentUID,
+          name: currentDisplayName,
+          text: text,
+          color: currentColor,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          attachments: []
+        });
+        // handle attachment upload
+        if(pendingAttachment){
+          const file = pendingAttachment.file;
+          const ext = file.name.split('.').pop();
+          const path = `attachments/${docRef.id}/${Date.now()}.${ext}`;
+          const snap = await storage.ref(path).put(file);
+          const url = await snap.ref.getDownloadURL();
+          const meta = {url, contentType: file.type, name: file.name};
+          await docRef.update({attachments: firebase.firestore.FieldValue.arrayUnion(meta)});
+        }
+        messageInput.value = '';
+        pendingAttachment = null;
+        attachPreview.textContent = '';
+      }catch(e){console.error(e);alert('Send failed')}
+      sendBtn.disabled = false;
+    });
+
+    // attach file
+    fileInput.addEventListener('change', ()=>{
+      const f = fileInput.files[0];
+      if(!f) return;
+      pendingAttachment = {file:f, type: f.type};
+      attachPreview.textContent = `${f.name} (${Math.round(f.size/1024)}KB)`;
+    });
+
+    // --- Real-time listener ---
+    let unsubscribe = null;
+    function listenMessages(){
+      if(unsubscribe) unsubscribe();
+      unsubscribe = db.collection('messages').orderBy('timestamp').limit(300).onSnapshot(snap=>{
+        messagesEl.innerHTML = '';
+        snap.forEach(doc=>{
+          const data = doc.data();
+          const id = doc.id;
+          const el = renderMessage(id, data);
+          messagesEl.appendChild(el);
+        });
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }, err=>{
+        console.error('listen err',err);
+        statusEl.textContent = 'Failed to load messages';
+      });
+    }
+
+    
+
+    // --- render message, replace shortcodes with images using customEmojis map ---
+    function renderMessage(id, data){
+      const wrapper = document.createElement('div');
+      wrapper.classList.add('msg');
+      wrapper.classList.add(data.uid === currentUID? 'own' : 'other');
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const time = data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().toLocaleString() : '';
+      meta.textContent = `${data.name || 'Anonymous'} ${time}`;
+      wrapper.appendChild(meta);
+
+      const content = document.createElement('div');
+      content.className = 'content';
+      content.innerHTML = parseTextWithEmojis(escapeHtml(data.text || ''));
+      
+      // ★ 色を適用
+if (data.color) {
+  content.style.color = data.color;
+}
+      
+      wrapper.appendChild(content);
+
+      // attachments
+      if(Array.isArray(data.attachments) && data.attachments.length){
+        const attachWrap = document.createElement('div');
+        attachWrap.className = 'attachments';
+        data.attachments.forEach(a=>{
+          if(a.contentType && a.contentType.startsWith('image')){
+            const img = document.createElement('img');
+            img.src = a.url;
+            img.style.maxWidth='320px';
+            img.style.borderRadius='8px';
+            img.alt = a.name || '';
+            attachWrap.appendChild(img);
+          } else if(a.contentType && a.contentType.startsWith('video')){
+            const v = document.createElement('video');
+            v.src = a.url; v.controls = true; v.style.maxWidth='420px'; v.style.borderRadius='8px';
+            attachWrap.appendChild(v);
+          } else {
+            const link = document.createElement('a');
+            link.href=a.url; link.textContent = a.name || a.url; link.target='_blank';
+            attachWrap.appendChild(link);
+          }
+        });
+        wrapper.appendChild(attachWrap);
+      }
+
+      // delete button (only for owner)
+      if(data.uid === currentUID){
+        const del = document.createElement('button');
+        del.className = 'delete-btn small';
+        del.textContent = 'Delete';
+        del.addEventListener('click', async ()=>{
+          if(!confirm('Delete this message?')) return;
+          try{
+            // delete attachments from storage
+            if(Array.isArray(data.attachments)){
+              for(const a of data.attachments){
+                try{
+                  const ref = storage.refFromURL(a.url);
+                  await ref.delete();
+                }catch(e){console.warn('delete file failed',e)}
+              }
+            }
+            await db.collection('messages').doc(id).delete();
+            // UI will update by snapshot
+          }catch(e){console.error(e);alert('Delete failed')}
+        });
+        wrapper.appendChild(del);
+      }
+
+      return wrapper;
+    }
+
+    // --- Emoji shortcodes parsing ---
+    function parseTextWithEmojis(text){
+      // replace :shortcode: with <img src=...>
+      return text.replace(/:([a-zA-Z0-9_+-]+):/g, (m, sc)=>{
+        const key = `:${sc}:`;
+        if(customEmojis[key]){
+          return `<img class="emoji-inline" src="${customEmojis[key].url}" alt="${key}">`;
+        }
+        return m;
+      }).replace(/\n/g,'<br>');
+    }
+
+    function escapeHtml(s){
+      return (s||'').replace(/[&<>\"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;' }[c]||c));
+    }
+
+    // --- Emoji manager: upload emoji to storage and register in "emojis" collection ---
+    addEmojiBtn.addEventListener('click', async ()=>{
+      const shortcode = (emojiShortcodeInput.value || '').trim();
+      const file = emojiFileInput.files[0];
+      if(!shortcode || !file) return alert('shortcode and file required');
+      if(!shortcode.startsWith(':') || !shortcode.endsWith(':')) return alert('shortcode must be like :name:');
+      const key = shortcode;
+      addEmojiBtn.disabled = true;
+      try{
+        const path = `emojis/${Date.now()}_${file.name}`;
+        const snap = await storage.ref(path).put(file);
+        const url = await snap.ref.getDownloadURL();
+        await db.collection('emojis').doc(key).set({shortcode:key,url,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+        emojiShortcodeInput.value=''; emojiFileInput.value='';
+        await loadCustomEmojis();
+      }catch(e){console.error(e);alert('Upload failed')}
+      addEmojiBtn.disabled = false;
+    });
+
+    // load emojis from Firestore
+    async function loadCustomEmojis(){
+      customEmojis = {};
+      const snap = await db.collection('emojis').get();
+      emojiListEl.innerHTML='';
+      snap.forEach(doc=>{
+        const d = doc.data();
+        customEmojis[d.shortcode] = d;
+        const item = document.createElement('div');
+        item.className='emoji-item small';
+        item.title = d.shortcode;
+        const img = document.createElement('img'); img.src=d.url; img.style.width='28px'; img.style.height='28px'; img.style.objectFit='cover';
+        item.appendChild(img);
+        item.addEventListener('click', ()=>{
+          // insert shortcode at cursor
+          insertAtCursor(messageInput, d.shortcode);
+          messageInput.focus();
+        });
+        // right-click to delete
+        item.addEventListener('contextmenu', async (ev)=>{
+          ev.preventDefault();
+          if(!confirm('Delete emoji '+d.shortcode+'?')) return;
+          try{
+            await db.collection('emojis').doc(d.shortcode).delete();
+            // attempt to delete file - best-effort
+            try{ const ref = storage.refFromURL(d.url); await ref.delete(); }catch(e){console.warn(e)}
+            await loadCustomEmojis();
+          }catch(e){console.error(e)}
+        });
+        emojiListEl.appendChild(item);
+      });
+    }
+
+    // helper to insert text at cursor in textarea
+    function insertAtCursor(field, value) {
+      if(document.selection){
+        field.focus();
+        const sel = document.selection.createRange();
+        sel.text = value;
+      } else if(field.selectionStart || field.selectionStart === 0){
+        const start = field.selectionStart;
+        const end = field.selectionEnd;
+        field.value = field.value.substring(0, start) + value + field.value.substring(end);
+        field.selectionStart = field.selectionEnd = start + value.length;
+      } else {
+        field.value += value;
+      }
+    }
+
+    // insert emoji special button - show quick pick of custom emojis
+    document.getElementById('insertEmojiBtn').addEventListener('click', ()=>{
+      // simple: open prompt with available shortcodes
+      const keys = Object.keys(customEmojis);
+      if(keys.length===0) return alert('No custom emojis yet');
+      const choice = prompt('Insert emoji shortcode:\n' + keys.join(' '));
+      if(choice) insertAtCursor(messageInput, choice);
+    });
+
+    // small helper: escape before sending? already trimmed above
+
+    // init
+    initAuth();
+
+    // Basic Firestore rules suggestion (for production, tighten up):
+    // Firestore: allow reads to messages; allow writes only if request.auth != null and request.resource.data.uid == request.auth.uid
+    // Storage: allow uploads only for authenticated users; allow deletes only for owner path patterns or secure via functions.
+    
+    const colorPicker = document.getElementById('colorPicker');
+let currentColor = localStorage.getItem('textColor') || '#e6f0ff';
+colorPicker.value = currentColor;
+
+colorPicker.addEventListener('input', ()=>{
+  currentColor = colorPicker.value;
+  localStorage.setItem('textColor', currentColor);
+});
+
+  function renderEmojiList() {
+  emojiListEl.innerHTML = '';
+  for (const key in customEmojis) {
+    const d = customEmojis[key];
+    const item = document.createElement('div');
+    item.className = 'emoji-item small';
+    item.title = key;
+    const img = document.createElement('img');
+    img.src = d.url;
+    img.style.width = '28px';
+    img.style.height = '28px';
+    item.appendChild(img);
+    item.addEventListener('click', () => {
+      insertAtCursor(messageInput, key);
+      messageInput.focus();
+    });
+    emojiListEl.appendChild(item);
+  }
+}
+
+renderEmojiList();  
+    
+  </script>
+  
+  
+  
+</body>
+</html>
