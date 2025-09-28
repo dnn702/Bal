@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>顔文字・AAコピペライブラリ</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#a6b0c2; --accent:#7dd3fc;
+      --radius:12px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; background:var(--bg);color:#e6eef8}
+    .app{display:grid;grid-template-columns:320px 1fr;gap:18px;padding:18px;height:100vh}
+
+    /* Sidebar */
+    .sidebar{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.6);overflow:auto}
+    .brand{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .brand h1{font-size:16px;margin:0}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .btn{background:rgba(255,255,255,0.03);padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    input[type="search"]{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+
+    .genres{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+    .genre{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+    .genre .swatch{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:grid;place-items:center;font-weight:700}
+    .genre .meta{flex:1}
+    .genre .meta small{display:block;color:var(--muted);font-size:12px}
+    .genre.active{outline:2px solid rgba(125,211,252,0.18)}
+
+    /* Main */
+    .main{display:flex;flex-direction:column;gap:12px}
+    .toolbar{display:flex;gap:8px;align-items:center}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;overflow:auto;padding:6px}
+    .card{background:var(--card);padding:12px;border-radius:12px;min-height:120px;display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,0.02);position:relative}
+    pre.aa{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:transparent;margin:0;padding:6px;border-radius:8px;flex:1;overflow:auto}
+    .card .actions{display:flex;gap:6px;align-items:center}
+    .small{font-size:12px;color:var(--muted)}
+    .toast{position:fixed;right:20px;bottom:20px;background:#0b1220;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 18px rgba(2,6,23,0.6)}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:none;align-items:center;justify-content:center}
+    .modal{background:#071127;padding:18px;border-radius:12px;max-width:760px;width:100%;box-shadow:0 10px 30px rgba(2,6,23,0.7)}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input[type=text],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    textarea{min-height:120px;font-family:ui-monospace,monospace;white-space:pre-wrap}
+
+    /* responsive */
+    @media(max-width:900px){.app{grid-template-columns:1fr} .sidebar{order:2} .main{order:1}}
+
+    /* small helpers */
+    .muted{color:var(--muted)}
+    .flex{display:flex;gap:8px;align-items:center}
+    .grow{flex:1}
+    .faded{opacity:0.6}
+    .img-preview{height:40px;border-radius:6px;object-fit:cover;border:1px solid rgba(255,255,255,0.04)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="サイドバー">
+      <div class="brand">
+        <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#4ade80);display:grid;place-items:center;font-weight:700;color:#04293a">顔</div>
+        <div>
+          <h1>顔文字・AAライブラリ</h1>
+          <div class="small muted">ジャンルで整理して、改行を保持してコピー</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="addGenreBtn" title="新しいジャンルを追加">＋ ジャンル追加</button>
+        <button class="btn" id="openImport">⤓ インポート/エクスポート</button>
+      </div>
+
+      <input id="search" type="search" placeholder="検索 — Ctrl+K" aria-label="検索">
+
+      <div class="genres" id="genresList" aria-live="polite"></div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.02)">
+      <div class="small muted">ショートカット: Ctrl+K 検索, Ctrl+N 新規AA</div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <div class="flex grow">
+          <button class="btn" id="newAA">＋ 新規AA</button>
+          <div class="muted">選択ジャンル: <span id="currentGenreName">(未選択)</span></div>
+        </div>
+        <div class="flex">
+          <label class="small muted" style="margin-right:6px">表示サイズ</label>
+          <select id="sizeSel" class="btn">
+            <option value="small">小</option>
+            <option value="medium" selected>中</option>
+            <option value="large">大</option>
+          </select>
+        </div>
+      </div>
+
+      <section class="grid" id="grid" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <!-- modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2 id="modalTitle">新しいAA</h2>
+      <div style="display:grid;gap:10px">
+        <label>内容（改行はそのまま保持されます）
+          <textarea id="aaText" placeholder="例:
+( ﾟ∀ﾟ)\n(ﾟ∀ﾟ )"></textarea>
+        </label>
+        <label>ジャンル
+          <select id="aaGenre"></select>
+        </label>
+        <label>タグ（カンマ区切り）
+          <input id="aaTags" type="text" placeholder="例: 笑い,かわいい">
+        </label>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" id="cancelModal">キャンセル</button>
+          <button class="btn" id="saveAA">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- import/export modal -->
+  <div class="modal-backdrop" id="ieBackdrop">
+    <div class="modal">
+      <h3>インポート / エクスポート</h3>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" id="exportBtn">エクスポート（JSON）</button>
+        <label class="btn">インポート
+          <input id="importFile" type="file" accept="application/json" style="display:none">
+        </label>
+        <button class="btn" id="closeIE">閉じる</button>
+      </div>
+      <div style="margin-top:10px" class="small muted">ローカルストレージに保存されます。バックアップを必ず取ってください。</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <template id="genreTpl">
+    <div class="genre" draggable="false">
+      <div class="swatch"></div>
+      <div class="meta">
+        <strong class="gname"></strong>
+        <small class="gdesc muted"></small>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <img class="img-preview" src="" alt="bg" style="display:none">
+        <button class="btn editGenre">編集</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="cardTpl">
+    <div class="card" draggable="true">
+      <pre class="aa"></pre>
+      <div class="actions">
+        <div class="small tags muted"></div>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn copyBtn">コピー</button>
+          <button class="btn editBtn">編集</button>
+          <button class="btn delBtn">削除</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // Simple high-perf data model with localStorage
+    const LSKEY = 'aa_library_v1'
+    const DEFAULT = {
+      genres:[{id:1,name:'顔文字',bg:'#0ea5a4',fg:'#041014',desc:'定番の顔文字',bgImage:null},{id:2,name:'AA',bg:'#dddddd',fg:'#041014',desc:'ASCIIアート',bgImage:'dames/dame.png'}],
+      items:[{id:1,genreId:1,text:'( ﾟ∀ﾟ)\n( ﾟ∀ﾟ)ﾉ',tags:['笑い']},{id:2,genreId:2,text:'┌(┌＾o＾)┐',tags:['踊る']}],
+      nextId:3, nextGenreId:3
+    }
+
+    function load(){
+      try{const raw=localStorage.getItem(LSKEY); if(raw) return JSON.parse(raw); }catch(e){}
+      localStorage.setItem(LSKEY,JSON.stringify(DEFAULT)); return JSON.parse(JSON.stringify(DEFAULT));
+    }
+    function save(){ localStorage.setItem(LSKEY,JSON.stringify(state)); }
+
+    let state = load();
+    let currentGenre = state.genres[0]?.id || null;
+
+    // DOM
+    const genresList = document.getElementById('genresList');
+    const grid = document.getElementById('grid');
+    const currentGenreName = document.getElementById('currentGenreName');
+    const search = document.getElementById('search');
+
+    // templates
+    const genreTpl = document.getElementById('genreTpl').content;
+    const cardTpl = document.getElementById('cardTpl').content;
+
+    // modals
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalTitle = document.getElementById('modalTitle');
+    const aaText = document.getElementById('aaText');
+    const aaGenre = document.getElementById('aaGenre');
+    const aaTags = document.getElementById('aaTags');
+    const saveAA = document.getElementById('saveAA');
+    const cancelModal = document.getElementById('cancelModal');
+
+    const ieBackdrop = document.getElementById('ieBackdrop');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+    const openImport = document.getElementById('openImport');
+    const closeIE = document.getElementById('closeIE');
+
+    const toastEl = document.getElementById('toast');
+
+    // util
+    function showToast(msg, ms=1800){ toastEl.textContent = msg; toastEl.style.display='block'; clearTimeout(toastEl._t); toastEl._t=setTimeout(()=>toastEl.style.display='none', ms); }
+    function uid(prefix='id'){ return prefix+Math.random().toString(36).slice(2,9); }
+
+    // render
+    function renderGenres(){
+      genresList.innerHTML='';
+      for(const g of state.genres){
+        const el = genreTpl.cloneNode(true);
+        const node = el.querySelector('.genre');
+        node.dataset.id = g.id;
+        node.querySelector('.swatch').style.background = g.bg; node.querySelector('.swatch').style.color = g.fg;
+        node.querySelector('.swatch').textContent = g.name[0]||'G';
+        node.querySelector('.gname').textContent = g.name;
+        node.querySelector('.gdesc').textContent = g.desc||'';
+        const img = node.querySelector('.img-preview');
+        if(g.bgImage){ img.src = g.bgImage; img.style.display='block'; } else img.style.display='none';
+        node.addEventListener('click', ()=>{ currentGenre = g.id; render(); });
+        node.querySelector('.editGenre').addEventListener('click',(e)=>{ e.stopPropagation(); openEditGenre(g); });
+        if(currentGenre===g.id) node.classList.add('active')
+        genresList.appendChild(node);
+      }
+    }
+
+    function renderGrid(){
+      grid.innerHTML='';
+      const q = search.value.trim().toLowerCase();
+      const items = state.items.filter(it=> (currentGenre? it.genreId===currentGenre : true) && (q? (it.text.toLowerCase().includes(q) || (it.tags||[]).join(',').toLowerCase().includes(q)) : true));
+
+      for(const it of items){
+        const el = cardTpl.cloneNode(true);
+        const card = el.querySelector('.card');
+        card.dataset.id = it.id;
+        const pre = card.querySelector('.aa');
+        pre.textContent = it.text; // preserves newlines
+        card.querySelector('.tags').textContent = (it.tags||[]).join(', ');
+        // copy
+        card.querySelector('.copyBtn').addEventListener('click', ()=>{ copyText(it.text); });
+        card.querySelector('.editBtn').addEventListener('click', ()=>{ openEditAA(it); });
+        card.querySelector('.delBtn').addEventListener('click', ()=>{ if(confirm('削除しますか？')){ state.items = state.items.filter(x=>x.id!==it.id); save(); render(); showToast('削除しました'); } });
+
+        // drag
+        card.addEventListener('dragstart',(e)=>{ e.dataTransfer.setData('text/plain', it.id); card.style.opacity=0.4; });
+        card.addEventListener('dragend',()=>card.style.opacity=1);
+        card.addEventListener('dragover',(e)=>e.preventDefault());
+        card.addEventListener('drop',(e)=>{
+          e.preventDefault(); const srcId = e.dataTransfer.getData('text/plain'); if(!srcId) return;
+          const dstId = it.id;
+          reorderItems(srcId, dstId);
+          render(); save();
+        });
+
+        grid.appendChild(el);
+      }
+    }
+
+    function render(){
+      const g = state.genres.find(x=>x.id===currentGenre);
+      currentGenreName.textContent = g ? g.name : '(未選択)';
+      renderGenres(); renderGrid(); populateGenreSelect();
+    }
+
+    // reorder
+    function reorderItems(srcId, dstId){
+      const si = state.items.findIndex(x=>x.id==srcId);
+      const di = state.items.findIndex(x=>x.id==dstId);
+      if(si<0||di<0||si===di) return;
+      const [item] = state.items.splice(si,1);
+      state.items.splice(di,0,item);
+    }
+
+    // copy preserving newlines
+    async function copyText(txt){
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(txt); showToast('コピーしました'); }
+        else{ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('コピーしました'); }
+      }catch(e){ showToast('コピーに失敗しました'); }
+    }
+
+    // new/edit AA
+    let editingAA = null;
+    function openNewAA(){ editingAA=null; modalTitle.textContent='新しいAA'; aaText.value=''; aaTags.value=''; modalBackdrop.style.display='flex'; populateGenreSelect(); }
+    function openEditAA(it){ editingAA=it; modalTitle.textContent='AAを編集'; aaText.value=it.text; aaTags.value=(it.tags||[]).join(','); modalBackdrop.style.display='flex'; populateGenreSelect(); aaGenre.value=it.genreId; }
+    function populateGenreSelect(){ aaGenre.innerHTML=''; for(const g of state.genres){ const o=document.createElement('option'); o.value=g.id; o.textContent=g.name; aaGenre.appendChild(o);} }
+
+    saveAA.addEventListener('click', ()=>{
+      const text = aaText.value;
+      if(!text.trim()){ alert('内容を入力してください'); return; }
+      const gid = parseInt(aaGenre.value||currentGenre||state.genres[0].id);
+      const tags = aaTags.value.split(',').map(s=>s.trim()).filter(Boolean);
+      if(editingAA){ editingAA.text = text; editingAA.tags = tags; editingAA.genreId = gid; }
+      else{ const id = state.nextId++; state.items.unshift({id,genreId:gid,text,tags}); }
+      save(); render(); modalBackdrop.style.display='none'; showToast('保存しました');
+    });
+    cancelModal.addEventListener('click', ()=>modalBackdrop.style.display='none');
+
+    // genres: add/edit
+    document.getElementById('addGenreBtn').addEventListener('click', ()=>{ const name = prompt('ジャンル名'); if(!name) return; const id=state.nextGenreId++; const g={id,name,desc:'',bg:'#fef3c7',fg:'#041014',bgImage:null}; state.genres.push(g); save(); render(); showToast('ジャンル追加'); openEditGenre(g); });
+
+    function openEditGenre(g){
+      // small inline editor prompt-style for simplicity
+      const name = prompt('ジャンル名', g.name); if(name===null) return;
+      g.name = name;
+      const desc = prompt('説明（任意）', g.desc||''); if(desc!==null) g.desc = desc;
+      const bg = prompt('背景色 hex (#rrggbb)', g.bg); if(bg!==null) g.bg = bg;
+      const fg = prompt('文字色 hex (#rrggbb)', g.fg); if(fg!==null) g.fg = fg;
+      // bg image
+      const wantImg = confirm('ジャンル背景に画像を設定しますか？ (OK=選択プロンプトを表示)');
+      if(wantImg){ const file = prompt('画像データのURLを貼ってください（ローカルファイルの場合は先にアップロードしてください）'); if(file) g.bgImage = file; }
+      save(); render(); showToast('ジャンルを更新しました');
+    }
+
+    // export/import
+    openImport.addEventListener('click', ()=>{ ieBackdrop.style.display='flex'; });
+    closeIE.addEventListener('click', ()=>ieBackdrop.style.display='none');
+    exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(state, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download='aa_library.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    importFile.addEventListener('change', ()=>{
+      const f = importFile.files[0]; if(!f) return; const r = new FileReader(); r.onload = ()=>{ try{ const j=JSON.parse(r.result); state=j; save(); render(); ieBackdrop.style.display='none'; showToast('インポート完了'); }catch(e){ alert('読み込み失敗'); } }; r.readAsText(f);
+    });
+
+    // new AA button
+    document.getElementById('newAA').addEventListener('click', ()=>{ openNewAA(); });
+    document.getElementById('addGenreBtn').addEventListener('keydown', (e)=>e.stopPropagation());
+
+    // keyboard
+    document.addEventListener('keydown',(e)=>{
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); search.focus(); search.select(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='n'){ e.preventDefault(); openNewAA(); }
+    });
+
+    // search debounce
+    let _t;
+    search.addEventListener('input', ()=>{ clearTimeout(_t); _t=setTimeout(()=>renderGrid(),150); });
+
+    // copy on click pre
+    grid.addEventListener('click',(e)=>{ if(e.target.tagName==='PRE'){ copyText(e.target.textContent); } });
+
+    // initial render
+    render();
+
+    // small performance: save periodically
+    setInterval(()=>save(), 4000);
+
+    // hint: expose state for debugging (dev only)
+    window.__AA_LIB__ = {state, save, render};
+  </script>
+</body>
+</html>
