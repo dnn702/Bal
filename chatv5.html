@@ -36,6 +36,11 @@ footer.small{font-size:12px;color:var(--muted);text-align:center;padding-top:8px
   display: grid;
   grid-template-columns: repeat(6, 36px); /* 横6列 */
   gap: 6px;
+  max-height: calc((36px + 6px) * 8); /* 1マスの高さ36px + 隙間6px × 8行分 */
+  overflow-y: auto;  /* 縦スクロール可能に */
+  padding-right: 4px;
+  
+  
 }
 .emoji-category-select {
   width: 100%;
