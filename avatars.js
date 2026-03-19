@@ -18,7 +18,7 @@ else if(sort=="cool") q=q.orderBy("cool","desc")
 else if(sort=="likes") q=q.orderBy("likes","desc")
 else q=q.orderBy("likes","desc")
 
-q=q.limit(50)
+q=q.limit(100)
 
 const snap=await q.get()
 
