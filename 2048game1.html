@@ -6,6 +6,13 @@
 
 
 body { font-family: Arial; text-align: center; background: white; overscroll-behavior: none; }
+
+body {
+  
+  touch-action: manipulation;        /* タップ高速化 */
+  
+}
+
 h1 { font-size: 60px; }
 #score, #best { background:#bbada0;color:white;padding:10px;border-radius:5px;display:inline-block;margin:5px; }
 #grid { display:grid; grid-gap:10px; background:#bbada0; padding:10px; margin:auto; position:relative; touch-action: none; }
@@ -52,24 +59,36 @@ const firebaseConfig = {
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
+let lastTouch = 0;
+
+document.addEventListener("touchend", function(e) {
+    const now = Date.now();
+
+    if (now - lastTouch < 300) {
+        e.preventDefault(); // ダブルタップ無効
+    }
+
+    lastTouch = now;
+}, { passive: false });
+
 const grid=document.getElementById("grid");
 const size=8;
 let cells=[],values=[],score=0n;
 let saved=false;
 
-const suffixes=["","k","m","b","t","q","Q","s","S","O","N"];
+const suffixes=["","k","m","b","t","q","Q","u","U","s","S","p","P","o","O","n","N","d","D","g","G","h","H","l","L","i","I","j","J","n","N","c","C","x","X","w","W","y","Y","z","Z","ww","WW","xx","XX","yy","YY","zz","ZZ","cc","CC","xyz","XYZ","v","V","dl","yp","!","?","<img style='width: 11.7px; height: 11.7px;' src='img/kg.png'>","","","","","","","","","","","",""];
 function formatBigInt(v){if(v<1000n)return v.toString();let i=0;while(v>=1000n){v/=1000n;i++;}return v+suffixes[i];}
 
 function updateCellDisplay(c,v){
-c.innerText=v>0n?formatBigInt(v):"";
+c.innerHTML=v>0n?formatBigInt(v):"";
 c.dataset.value=v.toString();
 }
 
 function updateScore(){
-document.getElementById("score").innerText="Score: "+formatBigInt(score);
+document.getElementById("score").innerHTML="Score: "+formatBigInt(score);
 let best=BigInt(localStorage.getItem("best")||"0");
 if(score>best){best=score;localStorage.setItem("best",best.toString());}
-document.getElementById("best").innerText="Best: "+formatBigInt(best);
+document.getElementById("best").innerHTML="Best: "+formatBigInt(best);
 }
 
 function createBoard(){
@@ -219,11 +238,34 @@ createBoard();
 
 <h3>この2048ゲームは、BigIntで表されています。バグなどにつきましては、このFirebase Chatなどで報告をお願いします。</h3>
 
+<a href="https://dnn702.github.io/Bal/suugaku.html">数学ゲームへ</a>
 
+<button style="padding: 10px 20px; font-size: 16px;" onclick="toggleIframe()">ON / OFF</button>
 
-
-<iframe style="width: 90%; height: 1000px; position: absolute; left: 0%; top: 100%;" src="https://dnn702.github.io/Bal/k.html"></iframe>
+<div style="display: none; margin-top: 10px;" id="frameBox">
+  <iframe style="width: 90%; height: 700px;" src="https://dnn702.github.io/Bal/suugaku.html"></iframe>
+  <iframe style="width: 90%; height: 1000px; position: absolute; left: 0%; top: 100%;" src="https://dnn702.github.io/Bal/k.html"></iframe>
 <iframe style="width: 95%; height: 1000px; position: absolute; left: 0%; top: 160%;" src="https://dnn702.github.io/Bal/zookeeper.html"></iframe>
+
+</div>
+
+<script>
+function toggleIframe() {
+  const box = document.getElementById("frameBox");
+
+  if (box.style.display === "none") {
+    box.style.display = "block";
+  } else {
+    box.style.display = "none";
+  }
+}
+</script>
+<img style='width: 11.7px; height: 11.7px;' src='img/kg.png'>
+
+
+
+
+
 
 
 
