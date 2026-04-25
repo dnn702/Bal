@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>計算バトル</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: linear-gradient(135deg, #1e1e2f, #3a3a6a);
+  color: white;
+  text-align: center;
+}
+
+button {
+  width: 90%;
+  max-width: 320px;
+  padding: 18px;
+  margin: 10px;
+  font-size: 20px;
+  border-radius: 12px;
+  border: none;
+  background: #4cafef;
+  color: white;
+}
+
+.hidden { display: none; }
+
+#score { font-size: 32px; }
+#timer { font-size: 28px; color: yellow; }
+#combo { font-size: 20px; color: cyan; }
+
+/* ★追加：称号カラー */
+.rainbow {
+  background: linear-gradient(to right, red, orange, yellow, lime, cyan, purple);
+  -webkit-background-clip: text;
+  color: transparent;
+  font-weight: bold;
+}
+
+.predator {
+  color: red;
+  font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<h1>計算バトル</h1>
+
+<div id="startScreen">
+  <button onclick="startGame()">▶ スタート</button>
+  <button onclick="showRanking()">🏆 ランキング</button>
+  
+  <button><a href="https://dnn702.github.io/Bal/2048game1.html">2048 Gameへ移動</a></button>
+  
+  <h2>こちらでチャットができます。</h2>
+  <iframe style="width: 90%; height: 700px;" src="https://dnn702.github.io/Bal/k.html"></iframe>
+  
+</div>
+
+<div id="gameScreen" class="hidden">
+  <div id="timer">30</div>
+  <div id="score">0</div>
+  <div id="combo">コンボ: 0</div>
+  <div id="question"></div>
+  <div id="choices"></div>
+</div>
+
+<div id="endScreen" class="hidden">
+  <h2 id="resultText"></h2>
+  <button onclick="startGame()">もう一回</button>
+  <button onclick="backToStart()">トップへ</button>
+</div>
+
+<div id="rankingScreen" class="hidden">
+  <h2>ランキング</h2>
+  <div id="rankingList"></div>
+  <button onclick="backToStart()">戻る</button>
+  <h4>・管理者により、このサイトには存在するはずがないレアな符号を付与される場合がございます。</h4>
+  <h4>・不正行為を行った場合は、こちら管理者の方でランキングアウトさせて頂く場合がございます。</h4>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<script>
+let score = 0n;
+let combo = 0;
+let correctAnswer;
+let time = 30;
+let timer;
+let lock = false;
+
+// ★追加：称号判定
+function getRank(score){
+  let s = Number(score);
+
+  if (s <= 500) return "初めての算数級";
+  if (s <= 1000) return "小学生級";
+  if (s <= 1200) return "中学生級";
+  if (s <= 1400) return "高校生級";
+  if (s <= 2000) return "大学生級";
+  if (s <= 3000) return "社会人級";
+  if (s <= 4000) return "レインボー級";
+  if (s <= 5000) return "ドクロ級";
+  return "プレデター王";
+}
+
+// ---------- 画面切替 ----------
+function startGame(){
+  hideAll();
+  document.getElementById("gameScreen").classList.remove("hidden");
+
+  score = 0n;
+  combo = 0;
+  time = 30;
+
+  generateQuestion();
+  startTimer();
+}
+
+function showRanking(){
+  hideAll();
+  document.getElementById("rankingScreen").classList.remove("hidden");
+  loadRanking();
+}
+
+function backToStart(){
+  hideAll();
+  document.getElementById("startScreen").classList.remove("hidden");
+}
+
+function hideAll(){
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("gameScreen").classList.add("hidden");
+  document.getElementById("endScreen").classList.add("hidden");
+  document.getElementById("rankingScreen").classList.add("hidden");
+}
+
+// ---------- 問題 ----------
+function rand(a,b){
+  return Math.floor(Math.random()*(b-a+1))+a;
+}
+
+function generateQuestion(){
+  let a = rand(1,20);
+  let b = rand(1,20);
+  let ops = ["+","-","*","/"];
+  let op = ops[rand(0,3)];
+
+  if(op==="/") a*=b;
+
+  correctAnswer = Math.floor(eval(`${a}${op}${b}`));
+
+  document.getElementById("question").innerText = `${a} ${op} ${b}`;
+  genChoices();
+}
+
+function genChoices(){
+  let arr=[correctAnswer];
+
+  while(arr.length<3){
+    let f = correctAnswer + rand(-10,10);
+    if(!arr.includes(f)) arr.push(f);
+  }
+
+  arr.sort(()=>Math.random()-0.5);
+
+  let html="";
+  arr.forEach(v=>{
+    html+=`<button onclick="answer(${v})">${v}</button>`;
+  });
+
+  document.getElementById("choices").innerHTML=html;
+}
+
+// ---------- 回答 ----------
+function answer(v){
+  if(lock) return;
+  lock = true;
+
+  let base = rand(1,10);
+
+  if(v===correctAnswer){
+    combo++;
+    score += BigInt(base + Math.floor(combo/3));
+  }else{
+    combo=0;
+    score -= 10n;
+    if(score<0n) score=0n;
+  }
+
+  update();
+
+  setTimeout(()=>{
+    lock=false;
+    generateQuestion();
+  },150);
+}
+
+// ---------- UI ----------
+function update(){
+  document.getElementById("score").innerText = score.toString();
+  document.getElementById("combo").innerText = "コンボ: "+combo;
+  document.getElementById("timer").innerText = time;
+}
+
+// ---------- タイマー ----------
+function startTimer(){
+  clearInterval(timer);
+  timer = setInterval(()=>{
+    time--;
+    update();
+
+    if(time<=0){
+      clearInterval(timer);
+      gameOver();
+    }
+  },1000);
+}
+
+// ---------- 終了 ----------
+async function gameOver(){
+  let name = prompt("名前");
+  if(!name) name="名無し";
+
+  // ★追加：称号取得
+  let rank = getRank(score);
+
+  await saveScore(name, score, rank);
+
+  document.getElementById("resultText").innerText =
+    `スコア: ${score} / 称号: ${rank}`;
+
+  hideAll();
+  document.getElementById("endScreen").classList.remove("hidden");
+}
+
+// ---------- Firebase ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyBtL38iD03ABVFbFOPm--Q3XQ1C5mbSxQI",
+  authDomain: "suugk-9b871.firebaseapp.com",
+  projectId: "suugk-9b871",
+  storageBucket: "suugk-9b871.firebasestorage.app",
+  messagingSenderId: "964343454214",
+  appId: "1:964343454214:web:9c11fbe1595752b6f1c187",
+  measurementId: "G-0ZCXY9QCTB"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ★修正：rank追加
+async function saveScore(name,score,rank){
+  await db.collection("ranking").add({
+    name:name,
+    score:score.toString(),
+    scoreNum:Number(score),
+    rank:rank,
+    time:Date.now()
+  });
+}
+
+// ★修正：ランキングに称号表示＋色
+async function loadRanking(){
+  let snap = await db.collection("ranking")
+    .orderBy("scoreNum","desc")
+    .limit(50)
+    .get();
+
+  let html="";
+  let i=1;
+
+  snap.forEach(doc=>{
+    let d=doc.data();
+
+    let rank = d.rank || getRank(d.scoreNum);
+
+    let cls="";
+    if(rank==="レインボー級") cls="rainbow";
+    if(rank==="プレデター王") cls="predator";
+
+    html += `
+      <div class="${cls}">
+        ${i}位 ${d.name} - ${d.score}pt（${rank}）
+      </div>
+    `;
+    i++;
+  });
+
+  document.getElementById("rankingList").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
