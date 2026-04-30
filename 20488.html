@@ -1,0 +1,886 @@
+<!DOCTYPE html><html lang="ja"><head>
+<meta charset="UTF-8" />
+    
+<title>2048 BigInt 8x8</title>
+<style>
+
+
+body { font-family: Arial; text-align: center; background: white; overscroll-behavior: none; }
+
+body {
+  
+  touch-action: manipulation;        /* タップ高速化 */
+  
+}
+
+#score img {
+  height: 0.725em;
+  width: auto;
+}
+
+
+#best img {
+  height: 0.7em;
+  width: auto;
+}
+
+#grid img {
+  height: 0.745em;
+  width: auto;
+}
+
+#finalScore img {
+  height: 0.745em;
+  width: auto;
+}
+
+#leaderList img {
+  height: 0.745em;
+  width: auto;
+}
+
+h1 { font-size: 60px; }
+#score, #best { background:#bbada0;color:white;padding:10px;border-radius:5px;display:inline-block;margin:5px; font-size: 60px;}
+#grid { display:grid; grid-gap:10px; background:#bbada0; padding:10px; margin:auto; position:relative; touch-action: none; }
+.cell { background:#cdc1b4; border-radius:5px; display:flex; align-items:center; justify-content:center; height:70px; width:70px; font-weight:bold; transition: transform 0.15s ease, background 0.2s; }
+.cell.merge { transform: scale(1.2); }/* 色 */ 
+.cell[data-value='2']{background:#eee4da} 
+.cell[data-value='80']{background:url('https://s7.ezgif.com/tmp/ezgif-7057092d4d7a8c1f.gif');color: black;} 
+.cell[data-value='4']{background:#ede0c8} 
+.cell[data-value='8']{background:#f2b179;color:#fff} 
+.cell[data-value='16']{background:#f59563;color:#fff} 
+.cell[data-value='32']{background:#f67c5f;color:#fff} 
+.cell[data-value='64']{background:#f65e3b;color:#fff} 
+.cell[data-value='128'],
+.cell[data-value='256'],
+.cell[data-value='512'],
+.cell[data-value='1024']{background:gold;color:#fff} 
+.cell[data-value='2048']{background:#edc22e;color:#fff} 
+.cell[data-value='4096']{background:paleturquoise} 
+.cell[data-value='8192']{background:greenyellow} 
+.cell[data-value='16384']{background:firebrick;color:#fff} 
+.cell[data-value='32768']{background:red;color:#fff} 
+.cell[data-value='65536']{background:yellowgreen} 
+.cell[data-value='131072']{background:linear-gradient(45deg,red,orange,yellow,greenyellow,cyan,purple);color:black} 
+.cell[data-value='262144']{background:url('https://dnn702.github.io/Bal/images/emojis/ar.png');background-size:cover;color:#fff}
+
+#rankingPage{display:none}
+
+/* ゲームオーバーUI */ #gameOverScreen{ position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(238,228,218,0.85); display:none; align-items:center; justify-content:center; flex-direction:column; font-size:28px; } button{margin:5px;padding:8px 14px} </style>
+
+</head>
+<body>
+<h1>2048 BigInt</h1>
+<div id="gamePage">
+<div id="score">Score: 0</div>
+<div id="best">Best: 0</div>
+<br>
+<button id="newGame">New Game</button>
+<button id="giveUp">ギブアップ</button>
+<button onclick="showRanking()">ランキング</button>
+<div id="grid"></div>
+<div id="gameOverScreen">
+<div id="finalScore"></div>
+<button onclick="confirmSave()">スコア登録</button>
+<button onclick="initGame()">もう一回</button>
+</div>
+</div><div id="rankingPage">
+<h2>ランキング</h2>
+<ol id="leaderList"></ol>
+<button onclick="hideRanking()">戻る</button>
+</div><script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDexDTYhiorR_ccbBUUgYBgpMC_gwH8ja8",
+  authDomain: "nyzhati.firebaseapp.com",
+  projectId: "nyzhati",
+  storageBucket: "nyzhati.firebasestorage.app",
+  messagingSenderId: "76057333441",
+  appId: "1:76057333441:web:797d05036f67bc22df0e40",
+  measurementId: "G-ETHN43R9QF"
+};
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+
+let lastTouch = 0;
+
+document.querySelectorAll("button").forEach(btn=>{
+  btn.addEventListener("touchend", function(e){
+    const now = Date.now();
+
+    if (now - lastTouch < 300) {
+      e.preventDefault();
+    }
+
+    lastTouch = now;
+  }, { passive: false });
+});
+
+const grid=document.getElementById("grid");
+const size=8;
+let cells=[],values=[],score=0n;
+let saved=false;
+
+const suffixes=["","k","m","b","t","q","Q","u","U","s","S","p","P","o","O","n","N","d","D","g","G","h","H","l","L","i","I","j","J","n","N","c","C","x","X","w","W","y","Y","z","Z","ww","WW","xx","XX","yy","YY","zz","ZZ","cc","CC","xyz","XYZ","v","V","dl","yp","!","?","🀆",
+"vvv","VVV","www","WWW","xxx","XXX","yyy","YYY","zzz","ZZZ","vvvv","VVVV",,"wwww","WWWW","xxxx","XXXX","yyyy","YYYY","zzzz",
+"ZZZZ","◘","◙","◘◘","◙◙","◘◘◘","◙◙◙","◘◘◘◘","◙◙◙◙","<span style='color: red;'>I</span><span style='color: yellow;'>I</span><span style='color: yellowgreen;'>I</span><span style='color: cyan;'>I</span>","IIII",
+"<span style='color: red;'>IIII</span>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/a.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/b.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/c.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/d.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211108.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211137.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211151.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211212.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211221.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211237.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211249.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211313.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C6_20260428211340.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/e.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/f.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/g.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/h.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/i.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/j.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/k.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/l.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/m.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/n.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/o.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/p.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/q.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/r.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/s.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/t.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/u.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/v.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/w.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/x.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/y.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/z.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/aa.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/ab.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/gk.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/gk1.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C7_20260426191819.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C7_20260428142653.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C7_20260428142707.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C7_20260428142720.png'>","<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/1.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/2.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/3.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/5.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/6.png'>",
+"<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/7.png'>",
+"<span style='color: red;'>N</span>","!!","!!!","!!!!","!!!!!","??","???","????","?????","¡","¿","‽","¡!","¿?","!¡","?¿","!?","?!","✥","!?!","?!?","!!?","??!","?!!","!??","!?!?","?!?!","!!??","??!!","UI","At","xy","XY","ᚏ","Ꮖ","ᏆᏆ","ᏆᏆᏆ","Ꮬ","Ꭶ","ᥗ","᰿","⁜",
+"⁂",
+"₦","₪","₧","₷","₽","₯","₡","ↀ","ↁ","ↂ","ↇ","ↈ","ↈↈ","ↈↈↈ","ↁↇ",
+"qp","Vb","↕","⋇","⌻","⌼","⌺","⌹","⌸","⎃","⎂","⎁","⎀","⏣","◚","◛","☰","☱","☲","☳","☴","☵","☶","☷","♔","♕","♖","♗","⚀","⚁","⚂","⚃","⚄","⚅","⛀","⛁","⛂","⛃","⛆","⛇","⛈","⛋","⛌",
+  "=̲̅",
+  "֍","֎","𖡧",
+  "𖡨","𖡗",
+  "𓋍",
+  "HH",
+  "<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183629.png'>",
+  "<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183739.png'>",
+  "<img src='https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183824.png'>"
+];
+function formatBigInt(v) {
+  if (v < 1000n) return v.toString();
+  let i = 0;
+  let temp = v;
+  
+  while (temp >= 1000n) {
+    temp /= 1000n;
+    i++;
+  }
+  
+  // suffixがない場合の保険
+  if (i >= suffixes.length) {
+    return temp.toString();
+  }
+  
+    // 👇ここが重要
+  return temp.toString() + suffixes[i];
+}
+
+function updateCellDisplay(c,v){
+c.innerHTML=v>0n?formatBigInt(v):"";
+c.dataset.value=v.toString();
+
+// 🔥 まずリセット（超重要）
+  c.style.background = "";
+  c.style.color = "";
+  
+  if (v >= 2n ** 19n) {
+    c.style.background = "paleturquoise";
+    c.style.color = "black";}
+    if (v >= 2n ** 20n) {
+    c.style.background = "url('https://media.timeout.com/images/105736729/750/422/image.jpg')";
+    c.style.color = "white";}
+    if (v >= 2n ** 21n) {
+    c.style.background = "url('https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/Screenshot_2026-04-26-19-08-41-521_com.google.android.apps.photos-edit.jpg')";
+    c.style.color = "white";}
+    if (v == 10n ** 267n) {
+    c.style.background = "white";
+    c.style.color = "black";}
+if (v == 2n ** 22n) {
+    c.style.background = "url('https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/ezgif-6727ec684753b2b3.gif')";
+    c.style.color = "black";}
+    if (v == 2n ** 23n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/dameda.gif')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+    if (v == 2n ** 24n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/lava.gif')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+    if (v == 2n ** 25n) {
+    c.style.background = "url('https://res.cloudinary.com/df3r3efat/image/upload/v1777535025/whwedwmbklpo0pqppaue.jpg')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+  if (v == 2n ** 26n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s0.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+  if (v == 2n ** 27n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s1.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 28n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s2.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 29n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s3.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 30n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s4.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 31n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s5.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "red";}
+if (v == 2n ** 32n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s6.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 33n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s7.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "magenta";}
+if (v == 2n ** 34n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s8.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 35n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s9.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 36n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/s10.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 37n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/sm.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 38n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/sa.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 39n) {
+    c.style.background = "#A4FF00";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 40n) {
+    c.style.background = "green";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 41n) {
+    c.style.background = "linear-gradient(45deg,red,white,red,red,white,red)";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 42n) {
+    c.style.background = "linear-gradient(45deg,red,yellow,greenyellow,cyan,purple)";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 43n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/d.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 44n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/e.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 45n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/f.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 46n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/g.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 47n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/h.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 48n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/i.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 49n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/j.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 50n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/k.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 51n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/l.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 52n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/m.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 53n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/n.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 54n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/o.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 55n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/p.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 56n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/t.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 57n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/r.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 58n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/u.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 59n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/v.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 60n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/w.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 61n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/x.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 62n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/y.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 63n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/z.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 64n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/aa.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 65n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ab.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 66n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ab1.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 67n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ad.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 68n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ae.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 69n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/af.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 70n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ag.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 71n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ah.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 72n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ai.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 73n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/aj.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 74n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ak.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "black";}
+if (v == 2n ** 75n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/al.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 76n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/am.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 77n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/an.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 78n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ao.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 79n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/ap.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 80n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/aq.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 81n) {
+    c.style.background = "url('https://dnn702.github.io/Bal/images/emojis/as.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 82n) {
+    c.style.background = "url('https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183629.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 83n) {
+    c.style.background = "url('https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183739.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+if (v == 2n ** 84n) {
+    c.style.background = "url('https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/img/%E7%84%A1%E9%A1%8C8_20260430183824.png')";
+    c.style.backgroundSize = "cover";
+  c.style.backgroundPosition = "center";
+  c.style.backgroundRepeat = "no-repeat";
+    c.style.color = "white";}
+
+    
+
+
+
+}
+
+
+
+function updateScore(){
+document.getElementById("score").innerHTML="Score: "+formatBigInt(score);
+let best=BigInt(localStorage.getItem("best")||"0");
+if(score>best){best=score;localStorage.setItem("best",best.toString());}
+document.getElementById("best").innerHTML="Best: "+formatBigInt(best);
+}
+
+function createBoard(){
+grid.style.gridTemplateColumns=`repeat(${size},70px)`;
+grid.innerHTML="";cells=[];values=[];saved=false;
+for(let i=0;i<size*size;i++){
+ let c=document.createElement("div");
+ c.className="cell";
+ grid.appendChild(c);
+ cells.push(c);
+ values.push(0n);
+}
+addTile();addTile();update();
+
+const rd = Math.random();
+
+if (rd >= 0.90) {
+
+values[0] = 2n**18n;
+values[1] = 2n**18n;
+values[2] = 2n**19n;
+values[3] = 2n**20n;
+values[4] = 2n**21n;
+values[5] = 2n**22n;
+values[6] = 2n**23n;
+values[7] = 2n**24n;
+values[15] = 2n**25n;
+values[14] = 2n**26n;
+values[13] = 2n**27n;
+values[12] = 2n**28n;
+values[11] = 2n**29n;
+values[10] = 2n**30n;
+values[9] = 2n**31n;
+values[8] = 2n**32n;
+values[16] = 2n**33n;
+values[17] = 2n**34n;
+values[18] = 2n**35n;
+values[19] = 2n**36n;
+values[20] = 2n**37n;
+values[21] = 2n**38n;
+values[22] = 2n**39n;
+values[23] = 2n**40n;
+values[31] = 2n**41n
+values[30] = 2n**42n
+values[29] = 2n**43n
+values[28] = 2n**44n
+values[27] = 2n**45n
+values[26] = 2n**46n
+values[25] = 2n**47n
+values[24] = 2n**48n
+values[32] = 2n**49n
+values[33] = 2n**50n
+values[34] = 2n**51n
+values[35] = 2n**52n
+values[36] = 2n**53n
+values[37] = 2n**54n
+values[38] = 2n**55n
+values[39] = 2n**56n
+values[47] = 2n**57n
+values[46] = 2n**58n
+values[45] = 2n**59n
+values[44] = 2n**60n
+values[43] = 2n**61n
+values[42] = 2n**62n
+values[41] = 2n**63n
+values[40] = 2n**64n
+values[48] = 2n**65n;
+values[49] = 2n**66n;
+values[50] = 2n**67n;
+values[51] = 2n**68n;
+values[52] = 2n**69n;
+values[53] = 2n**70n;
+values[54] = 2n**71n;
+values[55] = 2n**72n;
+
+values[63] = 2n**73n;
+values[62] = 2n**74n;
+values[61] = 2n**75n;
+values[60] = 2n**76n;
+values[59] = 2n**77n;
+values[58] = 2n**78n;
+values[57] = 2n**79n;
+values[56] = 2n**80n;
+
+} else if (rd >= 0.80) {
+  
+  const rs = Math.floor(Math.random()*999)+1;
+  
+  values[0] = 10n**276n*BigInt(rs);
+  
+}
+
+
+
+update();
+
+}
+
+function addTile(){
+let empty=values.map((v,i)=>v===0n?i:null).filter(v=>v!==null);
+if(!empty.length)return;
+let i=empty[Math.floor(Math.random()*empty.length)];
+values[i]=Math.random()<0.9?2n:4n;
+}
+
+function update(){
+for(let i=0;i<values.length;i++)updateCellDisplay(cells[i],values[i]);
+updateScore();
+}
+
+function move(dir){
+let moved=false;
+function get(r,c){return values[r*size+c]}
+function set(r,c,v){values[r*size+c]=v}
+for(let i=0;i<size;i++){
+ let arr=[];let idxs=[];
+ for(let j=0;j<size;j++){
+  let r=dir=="up"||dir=="down"?j:i;
+  let c=dir=="left"||dir=="right"?j:i;
+  if(dir=="right")c=size-1-j;
+  if(dir=="down")r=size-1-j;
+  arr.push(get(r,c));idxs.push([r,c]);
+ }
+ arr=arr.filter(v=>v>0n);
+ for(let k=0;k<arr.length-1;k++){
+  if(arr[k]==arr[k+1]){
+   arr[k]*=2n;
+   score=score*12n/10n+1n;
+   arr[k+1]=0n;
+   moved=true;
+  }
+ }
+ arr=arr.filter(v=>v>0n);
+ while(arr.length<size)arr.push(0n);
+ for(let k=0;k<size;k++){
+  let [r,c]=idxs[k];
+  if(get(r,c)!=arr[k]){
+   set(r,c,arr[k]);
+   cells[r*size+c].classList.add("merge");
+   setTimeout(()=>cells[r*size+c].classList.remove("merge"),120);
+   moved=true;
+  }
+ }
+}
+if(moved){addTile();update();checkGameOver();}
+}
+
+function checkGameOver(){
+if(values.includes(0n)) return;
+for(let r=0;r<size;r++){
+ for(let c=0;c<size;c++){
+  let v=values[r*size+c];
+  if(c<size-1 && values[r*size+c+1]===v) return;
+  if(r<size-1 && values[(r+1)*size+c]===v) return;
+ }
+}
+endGame();
+}
+
+function endGame(){
+if(saved)return;
+saved=true;
+document.getElementById("gameOverScreen").style.display="flex";
+document.getElementById("finalScore").innerHTML="スコア: "+formatBigInt(score);
+}
+
+window.confirmSave=async()=>{
+let name=prompt("名前");
+if(!name)name="匿名";
+await addDoc(collection(db,"scores"),{
+  name,
+  score: score.toString(),
+  digits: score.toString().length,
+  scorePad: score.toString().padStart(500, "0")
+});
+};
+
+window.initGame = function(){
+    document.getElementById("gameOverScreen").style.display = "none";
+    score = 0n;
+    createBoard();
+}
+
+// 操作
+document.addEventListener("keydown",e=>{
+if(e.key=="ArrowLeft")move('left');
+if(e.key=="ArrowRight")move('right');
+if(e.key=="ArrowUp")move('up');
+if(e.key=="ArrowDown")move('down');
+});
+
+// スワイプ
+let startX=0,startY=0,isDown=false;
+
+grid.addEventListener("mousedown",e=>{isDown=true;startX=e.clientX;startY=e.clientY;});
+document.addEventListener("mouseup",e=>{if(!isDown)return;isDown=false;handleSwipe(e.clientX,e.clientY);});
+
+grid.addEventListener("touchstart",e=>{startX=e.touches[0].clientX;startY=e.touches[0].clientY;});
+grid.addEventListener("touchend",e=>{handleSwipe(e.changedTouches[0].clientX,e.changedTouches[0].clientY);});
+
+function handleSwipe(endX,endY){
+let dx=endX-startX;
+let dy=endY-startY;
+if(Math.abs(dx)>Math.abs(dy)){
+ if(dx>20)move('right');
+ if(dx<-20)move('left');
+}else{
+ if(dy>20)move('down');
+ if(dy<-20)move('up');
+}
+}
+
+
+
+// ランキング
+window.showRanking=async()=>{
+document.getElementById("gamePage").style.display="none";
+document.getElementById("rankingPage").style.display="block";
+const q = query(
+  collection(db,"scores"),
+  orderBy("scorePad","desc"),
+  limit(20)
+);
+const snap=await getDocs(q);
+let html="";let i=1;
+snap.forEach(doc=>{let d=doc.data();html+=`<li>#${i++} ${d.name}: ${formatBigInt(BigInt(d.score))}</li>`});
+document.getElementById("leaderList").innerHTML=html;
+}
+window.hideRanking=()=>{
+document.getElementById("rankingPage").style.display="none";
+document.getElementById("gamePage").style.display="block";
+}
+
+// ギブアップ
+document.getElementById("giveUp").onclick=endGame;
+
+
+
+document.getElementById("newGame").onclick=initGame;
+
+createBoard();
+</script>
+
+<h3>この2048ゲームは、BigIntで表されています。バグなどにつきましては、このFirebase Chatなどで報告をお願いします。</h3>
+
+<a href="https://dnn702.github.io/Bal/suugaku.html">数学ゲームへ</a>
+
+<button style="padding: 10px 20px; font-size: 16px;" onclick="toggleIframe()">ON / OFF</button>
+
+<div style="display: none; margin-top: 10px;" id="frameBox">
+  <iframe style="width: 90%; height: 700px;" src="https://dnn702.github.io/Bal/suugaku.html"></iframe>
+  <iframe style="width: 90%; height: 1000px; position: relative; left: 0%; top: 100%;" src="https://dnn702.github.io/Bal/k.html"></iframe>
+<iframe style="width: 95%; height: 1000px; position: relative; left: 0%; top: 160%;" src="https://dnn702.github.io/Bal/zookeeper.html"></iframe>
+
+</div>
+
+<script>
+function toggleIframe() {
+  const box = document.getElementById("frameBox");
+
+  if (box.style.display === "none") {
+    box.style.display = "block";
+  } else {
+    box.style.display = "none";
+  }
+}
+</script>
+<img style='width: 11.7px; height: 11.7px;' src='img/kg.png'>
+
+
+
+
+
+
+
+
+</body>
+</html>
