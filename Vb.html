@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>万能ビデオ倍速ツール</title>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js"></script>
+<style>
+body{font-family:sans-serif;padding:20px}
+video{width:100%;max-width:800px}
+input,button{font-size:18px;margin:5px}
+</style>
+</head>
+<body>
+
+<h2>万能ビデオ倍速ツール</h2>
+
+<input type="file" id="file" accept="video/*">
+
+<br>
+
+<video id="video" controls playsinline></video>
+
+<br>
+
+<input id="rate" value="185/60">
+<button id="apply">倍率適用</button>
+
+<p id="status">待機中</p>
+
+<script>
+const { createFFmpeg, fetchFile } = FFmpeg;
+const ffmpeg = createFFmpeg({ log:true });
+
+const fileInput=document.getElementById("file");
+const video=document.getElementById("video");
+const status=document.getElementById("status");
+
+async function ensureFFmpeg(){
+  if(!ffmpeg.isLoaded()){
+    status.textContent="FFmpeg読込中...";
+    await ffmpeg.load();
+  }
+}
+
+fileInput.addEventListener("change", async ()=>{
+  const file=fileInput.files[0];
+  if(!file) return;
+
+  try{
+    status.textContent="変換準備...";
+    await ensureFFmpeg();
+
+    ffmpeg.FS("writeFile", "input",
+      await fetchFile(file)
+    );
+
+    status.textContent="MP4変換中...";
+    await ffmpeg.run(
+      "-i","input",
+      "-c:v","libx264",
+      "-c:a","aac",
+      "output.mp4"
+    );
+
+    const data=ffmpeg.FS(
+      "readFile",
+      "output.mp4"
+    );
+
+    const url=URL.createObjectURL(
+      new Blob(
+        [data.buffer],
+        {type:"video/mp4"}
+      )
+    );
+
+    video.src=url;
+    status.textContent="再生可能";
+  }catch(e){
+    status.textContent="変換失敗";
+    console.error(e);
+  }
+});
+
+function parseRate(t){
+  if(t.includes("/")){
+    const [a,b]=t.split("/");
+    return Number(a)/Number(b);
+  }
+  return Number(t);
+}
+
+document.getElementById("apply")
+.addEventListener("click",()=>{
+  video.playbackRate=
+    parseRate(
+      document.getElementById("rate").value
+    );
+  video.play();
+});
+</script>
+
+</body>
+</html>
