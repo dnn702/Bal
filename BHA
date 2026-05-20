@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video BPM Tool</title>
+
+<script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+
+<style>
+body{
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  padding:20px;
+  background:#f5f5f5;
+}
+video{
+  width:100%;
+  max-width:800px;
+  background:black;
+  border-radius:12px;
+  margin-top:16px;
+}
+input,button{
+  font-size:16px;
+  padding:8px 12px;
+  margin:4px;
+}
+#status{
+  margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<h2>動画倍速ツール</h2>
+
+<input id="fileInput" type="file" accept="video/*">
+
+<video
+  id="video"
+  controls
+  playsinline
+  preload="metadata"
+  muted
+></video>
+
+<div>
+  <label>速度:</label>
+  <input id="rateInput" value="185/60">
+  <button id="applyRate">速度適用</button>
+</div>
+
+<div>
+  <label>ピッチ:</label>
+  <input id="pitchInput" value="1">
+  <button id="applyPitch">ピッチ適用</button>
+</div>
+
+<div id="status">
+動画を選択してください
+</div>
+
+<script>
+const fileInput =
+  document.getElementById(
+    "fileInput"
+  );
+
+const video =
+  document.getElementById(
+    "video"
+  );
+
+const rateInput =
+  document.getElementById(
+    "rateInput"
+  );
+
+const pitchInput =
+  document.getElementById(
+    "pitchInput"
+  );
+
+const status =
+  document.getElementById(
+    "status"
+  );
+
+let objectURL = null;
+
+let audioCtx = null;
+let soundTouch = null;
+let filter = null;
+
+function parseRate(text){
+  text = text.trim();
+
+  if(text.includes("/")){
+    const [a,b] =
+      text.split("/");
+
+    return Number(a)
+      / Number(b);
+  }
+
+  return Number(text);
+}
+
+fileInput.addEventListener(
+"change",
+async ()=>{
+  const file =
+    fileInput.files[0];
+
+  if(!file) return;
+
+  status.textContent =
+    "読み込み中...";
+
+  if(objectURL){
+    URL.revokeObjectURL(
+      objectURL
+    );
+  }
+
+  objectURL =
+    URL.createObjectURL(
+      file
+    );
+
+  video.src = objectURL;
+  video.load();
+
+  try{
+    await setupAudio(file);
+
+    status.textContent =
+      "読み込み成功";
+  }catch(err){
+    console.error(err);
+
+    status.textContent =
+      "音声解析失敗";
+  }
+});
+
+video.addEventListener(
+"error",
+()=>{
+  status.textContent =
+    "動画再生失敗";
+});
+
+document
+.getElementById(
+  "applyRate"
+)
+.addEventListener(
+"click",
+async ()=>{
+  const rate =
+    parseRate(
+      rateInput.value
+    );
+
+  video.playbackRate =
+    rate;
+
+  if(soundTouch){
+    soundTouch.tempo =
+      rate;
+  }
+
+  await playAll();
+
+  status.textContent =
+    "速度: " + rate;
+});
+
+document
+.getElementById(
+  "applyPitch"
+)
+.addEventListener(
+"click",
+async ()=>{
+  const pitch =
+    Number(
+      pitchInput.value
+    );
+
+  if(soundTouch){
+    soundTouch.pitch =
+      pitch;
+  }
+
+  await playAll();
+
+  status.textContent =
+    "ピッチ: " + pitch;
+});
+
+async function playAll(){
+  if(audioCtx &&
+    audioCtx.state ===
+    "suspended"){
+    await audioCtx.resume();
+  }
+
+  await video.play();
+}
+
+async function setupAudio(
+  file
+){
+  const arrayBuffer =
+    await file
+    .arrayBuffer();
+
+  audioCtx =
+    new AudioContext();
+
+  const audioBuffer =
+    await audioCtx
+    .decodeAudioData(
+      arrayBuffer
+    );
+
+  const source = {
+    extract(
+      target,
+      numFrames,
+      pos
+    ){
+      const l =
+        audioBuffer
+        .getChannelData(0);
+
+      const r =
+        audioBuffer
+        .numberOfChannels>1
+        ? audioBuffer
+          .getChannelData(1)
+        : l;
+
+      for(
+        let i=0;
+        i<numFrames;
+        i++
+      ){
+        target[i*2] =
+          l[pos+i]||0;
+
+        target[i*2+1] =
+          r[pos+i]||0;
+      }
+
+      return Math.min(
+        numFrames,
+        l.length-pos
+      );
+    }
+  };
+
+  soundTouch =
+    new soundtouch
+    .SoundTouch(
+      audioBuffer
+      .sampleRate
+    );
+
+  const stFilter =
+    new soundtouch
+    .SimpleFilter(
+      source,
+      soundTouch
+    );
+
+  filter =
+    new soundtouch
+    .getWebAudioNode(
+      audioCtx,
+      stFilter
+    );
+
+  filter.connect(
+    audioCtx.destination
+  );
+}
+</script>
+
+</body>
+</html>
