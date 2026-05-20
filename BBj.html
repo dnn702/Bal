@@ -53,6 +53,12 @@ input,button{
   <input id="rateInput" value="185/60">
   <button id="applyBtn">適用</button>
 </div>
+  <script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+
+<br>
+<label>ピッチ:</label>
+<input id="pitchInput" value="1">
+<button id="applyPitch">ピッチ適用</button>
 
 <div id="status">動画を選択してください</div>
 
@@ -137,6 +143,87 @@ applyBtn.addEventListener("click", async () => {
     status.textContent =
       "倍率エラー or 再生失敗";
     console.error(err);
+  }
+});
+  let audioCtx;
+let sourceNode;
+let soundTouch;
+let filter;
+
+async function setupPitch(file){
+  const arrayBuffer = await file.arrayBuffer();
+
+  audioCtx = new AudioContext();
+
+  const audioBuffer =
+    await audioCtx.decodeAudioData(arrayBuffer);
+
+  const source =
+    {
+      extract: function(target, numFrames, pos){
+        const l =
+          audioBuffer.getChannelData(0);
+        const r =
+          audioBuffer.numberOfChannels > 1
+          ? audioBuffer.getChannelData(1)
+          : l;
+
+        for(let i=0;i<numFrames;i++){
+          target[i*2] = l[pos+i] || 0;
+          target[i*2+1] = r[pos+i] || 0;
+        }
+
+        return Math.min(
+          numFrames,
+          l.length-pos
+        );
+      }
+    };
+
+  soundTouch =
+    new soundtouch.SoundTouch(
+      audioBuffer.sampleRate
+    );
+
+  const pitch =
+    Number(
+      document.getElementById(
+        "pitchInput"
+      ).value
+    );
+
+  soundTouch.pitch = pitch;
+
+  const stSource =
+    new soundtouch.SimpleFilter(
+      source,
+      soundTouch
+    );
+
+  filter =
+    new soundtouch.getWebAudioNode(
+      audioCtx,
+      stSource
+    );
+
+  filter.connect(
+    audioCtx.destination
+  );
+}
+
+document
+.getElementById("applyPitch")
+.addEventListener(
+"click",
+()=>{
+  if(soundTouch){
+    soundTouch.pitch =
+      Number(
+        document
+        .getElementById(
+          "pitchInput"
+        ).value
+      );
   }
 });
 </script>
