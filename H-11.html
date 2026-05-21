@@ -990,16 +990,16 @@ function showToast(
   },1000);
 }
 
-function openCategoryModal(){
+window.openCategoryModal = function() {
   document
-  .getElementById(
-    "categoryModal"
-  )
-  .classList
-  .remove("hidden");
+    .getElementById(
+      "categoryModal"
+    )
+    .classList
+    .remove("hidden");
 }
 
-function closeCategoryModal(){
+window.closeCategoryModal = function(){
   document
   .getElementById(
     "categoryModal"
@@ -1008,7 +1008,7 @@ function closeCategoryModal(){
   .add("hidden");
 }
 
-function submitCategory(){
+window.submitCategory = function(){
 
   const title=
   document
@@ -1089,6 +1089,8 @@ content.addEventListener(
 
 renderTabs();
 renderContent();
+
+console.log("JS開始");
 </script>
 
 </body>
