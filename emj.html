@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>コピペサイト</title>
+
+<style>
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button,
+.item,
+.tabButton {
+  user-select: none;
+  -webkit-user-select: none;
+}
+body{
+  font-family:sans-serif;
+  background:#f3f3f3;
+  margin:20px;
+}
+
+.category{
+  border-radius:15px;
+  padding:15px;
+  margin-bottom:20px;
+  color:white;
+}
+
+.category h2{
+  margin-top:0;
+}
+
+.item{
+  background:rgba(255,255,255,0.85);
+  color:black;
+  padding:10px;
+  margin:8px 0;
+  border-radius:10px;
+  cursor:pointer;
+  white-space:pre-wrap;
+}
+
+.item:hover{
+  background:white;
+}
+
+.toast{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:black;
+  color:white;
+  padding:10px 20px;
+  border-radius:10px;
+  display:none;
+  z-index:9999;
+}
+
+#mainLayout {
+  display: flex;
+  gap: 15px;
+  height: 80vh;
+}
+
+/* 左のジャンル欄 */
+#categoryTabs {
+  width: 130px;
+  min-width: 130px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 5px;
+}
+
+/* スクロールバー */
+#categoryTabs::-webkit-scrollbar {
+  width: 8px;
+}
+
+#categoryTabs::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 10px;
+}
+
+/* ジャンルボタン */
+.tabButton {
+  min-height: 70px;
+  padding: 8px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  
+  transition: 0.2s;
+}
+
+/* 選択中だけ黒枠 */
+.tabButton.active {
+  outline: 4px solid black;
+}
+
+/* 右の内容欄 */
+#contentArea {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+button{
+  padding:10px 15px;
+  margin-right:8px;
+  margin-bottom:15px;
+  cursor:pointer;
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:9998;
+}
+
+.hidden{
+  display:none;
+}
+
+.modalBox{
+  background:white;
+  padding:20px;
+  border-radius:15px;
+  width:min(400px,90%);
+  color:black;
+  position:relative;
+}
+
+.modalBox input{
+  width:100%;
+  margin:8px 0 15px;
+  padding:8px;
+  box-sizing:border-box;
+}
+
+.closeBtn{
+  position:absolute;
+  top:10px;
+  right:10px;
+  border:none;
+  background:none;
+  font-size:24px;
+  cursor:pointer;
+}
+.firebase-post {
+  pointer-events: auto !important;
+}
+
+.firebase-post button {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 999999 !important;
+  touch-action: auto !important;
+}
+</style>
+</head>
+
+<body>
+
+<button type="button" onclick="openCategoryModal()">
+＋ジャンル追加
+</button>
+
+<div id="postBox">
+
+<select id="postCategory"></select>
+
+<select id="postType">
+  <option value="text">文字</option>
+  <option value="image">画像</option>
+</select>
+
+<textarea
+ id="postText"
+ placeholder="文字入力"
+></textarea>
+
+<input
+ type="file"
+ id="postImage"
+ accept="image/*"
+>
+
+<button onclick="submitPost()">
+投稿
+</button>
+
+</div>
+
+<div id="mainLayout">
+  <div id="categoryTabs"></div>
+  <div id="contentArea"></div>
+</div>
+
+<div class="toast" id="toast">コピーしました</div>
+
+<!-- ジャンル追加モーダル -->
+<div id="categoryModal" class="modal hidden">
+  <div class="modalBox">
+    <button class="closeBtn" onclick="closeCategoryModal()">×</button>
+
+    <h2>ジャンル追加</h2>
+
+    <label>ジャンル名（HTML可）</label>
+    <input id="categoryNameInput" type="text">
+
+    <label>ボックスカラー</label>
+    <input
+      id="categoryStyleInput"
+      type="text"
+      placeholder="#ff0000 / linear-gradient(...) / url('bg.png')"
+    >
+
+    <button onclick="submitCategory()">
+      追加
+    </button>
+  </div>
+</div>
+
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+  increment
+}
+from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+
+
+import {
+  getAuth,
+  signInAnonymously
+}
+from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+// Import the functions you need from the SDKs you need
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCo0SetKza2DF9_jQDT3FVmSJpth3nfboo",
+  authDomain: "omaerahamakeinu.firebaseapp.com",
+  projectId: "omaerahamakeinu",
+  storageBucket: "omaerahamakeinu.firebasestorage.app",
+  messagingSenderId: "1072754516000",
+  appId: "1:1072754516000:web:a5f2e7a6e42a260571dc45",
+  measurementId: "G-8DXLZTSYZ2"
+};
+
+// Initialize Firebase
+const app =
+  initializeApp(firebaseConfig);
+
+const db =
+  getFirestore(app);
+
+
+
+const auth =
+  getAuth(app);
+
+await signInAnonymously(auth);
+const DEFAULT_DATA = [
+{
+  title:"顔文字",
+  boxStyle:"#4a90e2",
+  items:[
+    "(´・ω・｀)",
+    "(＾ω＾)"
+  ]
+},
+{
+  title:"AA",
+  boxStyle:"linear-gradient(45deg,#ff7eb3,#ff758c)",
+  items:[
+`　 ∧＿∧
+　(　・ω・)
+　( つ旦O
+　と＿)_)`
+  ]
+},
+{
+  title: "<b style='color: black;'>絵文字</b>",
+  boxStyle: "linear-gradient(yellow, white, yellow)",
+  items: [
+    "📱👆🙂",
+    "🙂👍📱➡️⌨️➡️📨",
+    "絵文字で遊ばないで！",
+    "📱💬📸🎮🎵",
+    "👉📱✨",
+    "📱🔥😳",
+    "📱⚡️💥🔥",
+    "😨📱🔥➡️🚨🚒",
+    "📱🔥😱💨🚨",
+    "✧･ﾟ: ✧･ﾟ: ✨ 𝓢𝓹𝓪𝓻𝓴𝓵𝓮 𝓦𝓸𝓻𝓵𝓭 ✨ :･ﾟ✧:･ﾟ✧",
+    "｡･::･ﾟ★,｡･::･ﾟ☆",
+    "✦ ⟡ ✧ ⟢ ✨ ⟡ ✦",
+    "𝓬𝓱𝓪𝓶𝓹𝓪𝓰𝓷𝓮 𝓼𝓱𝓲𝓷𝓮 🍾✨",
+    "⋆｡ﾟ☁︎｡⋆｡ ﾟ☾ ﾟ｡⋆",
+    "✧･ﾟ: ✧･ﾟ: 💎 𝒢𝓁𝒾𝓉𝓉𝑒𝓇 𝒟𝓇𝑒𝒶𝓂💎 :･ﾟ✧:･ﾟ✧",
+    "⋆ ˚｡⋆୨୧˚ 𝓢𝓹𝓪𝓻𝓴𝓵𝓮 𝓶𝓸𝓸𝓭 ˚୨୧⋆｡˚ ⋆",
+    "✧ ⊹ ˚ ✦ ⊹ ˚ ✧ ⊹ ˚ ✦ ⊹ ˚ ✧"
+  ]
+},
+{
+  title:"スタンプ",
+  boxStyle:"linear-gradient(45deg,#00c6ff,#0072ff)",
+  items:[
+    {
+      type:"image",
+      src:"stamp1.gif"
+    }
+  ]
+}
+];
+
+let DATA =
+JSON.parse(
+  localStorage.getItem("copySiteData")
+) || DEFAULT_DATA;
+
+DATA = DATA.map((cat, index) => ({
+  ...cat,
+  custom: cat.custom ?? (index >= DEFAULT_DATA.length)
+}));
+
+function saveData(){
+  localStorage.setItem(
+    "copySiteData",
+    JSON.stringify(DATA)
+  );
+}
+
+const tabs =
+document.getElementById("categoryTabs");
+
+const content =
+document.getElementById("contentArea");
+
+let currentIndex = 0;
+let unsubscribePosts = null;
+
+
+window.submitPost = async () => {
+  
+  const category =
+    document.getElementById(
+      "postCategory"
+    ).value;
+  
+  const type =
+    document.getElementById(
+      "postType"
+    ).value;
+  
+  if (type === "text") {
+    
+    const text =
+      document.getElementById(
+        "postText"
+      ).value;
+    
+    await addDoc(
+      collection(db, "posts"),
+      {
+        category,
+        type: "text",
+        text,
+        likes: 0,
+        uid: auth.currentUser.uid,
+        createdAt: Date.now()
+      }
+    );
+  }
+  
+ if (type === "image") {
+  
+  const file =
+    document.getElementById(
+      "postImage"
+    ).files[0];
+  
+  if (!file) return;
+  
+  const imageBase64 =
+    await resizeAndEncode(file);
+  
+  await addDoc(
+    collection(db, "posts"),
+    {
+      category,
+      type: "image",
+      imageBase64,
+      likes: 0,
+      uid: auth.currentUser.uid,
+      createdAt: Date.now()
+    }
+  );
+}
+  
+  showToast("投稿しました");
+};
+
+function loadFirebasePosts(category){
+
+  if (unsubscribePosts) {
+    unsubscribePosts();
+  }
+
+  unsubscribePosts = onSnapshot(
+    collection(db,"posts"),
+    snap=>{
+
+      content
+        .querySelectorAll(
+          ".firebase-post"
+        )
+        .forEach(el=>el.remove());
+
+      snap.forEach(docSnap=>{
+
+        const post =
+          docSnap.data();
+
+        if(
+          post.category !== category
+        ) return;
+
+        // 全体
+        const item =
+          document.createElement(
+            "div"
+          );
+
+        item.className =
+          "item firebase-post";
+
+        // ===== 本文表示だけ =====
+        const body =
+          document.createElement(
+            "div"
+          );
+
+        if(
+          post.type === "text"
+        ){
+          body.innerHTML =
+            post.text;
+        }
+
+        if(
+          post.type === "image"
+        ){
+          body.innerHTML =
+            `<img src="${post.imageBase64}" style="max-width:150px">`;
+        }
+
+        item.appendChild(body);
+
+        // ===== ボタン欄 =====
+        const buttonRow =
+          document.createElement(
+            "div"
+          );
+
+        buttonRow.style.marginTop =
+          "8px";
+
+        // ------------------
+        // コピー
+        // ------------------
+        const copyBtn =
+          document.createElement(
+            "button"
+          );
+
+        copyBtn.textContent =
+          "📋コピー";
+
+        copyBtn.onclick =
+        async()=>{
+
+          if(
+            post.type === "text"
+          ){
+            await navigator
+              .clipboard
+              .writeText(
+                post.text
+              );
+
+            showToast(
+              "文字をコピー"
+            );
+          }
+
+          if (post.type === "image") {
+  
+  try {
+    
+    const img = new Image();
+    img.src = post.imageBase64;
+    await img.decode();
+    
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(resolve, "image/png");
+    });
+    
+    if (!blob) {
+      throw new Error("blob生成失敗");
+    }
+    
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": blob
+      })
+    ]);
+    
+    showToast("画像コピー成功");
+    
+  } catch (err) {
+    
+    console.error("コピーエラー:", err);
+    showToast("コピーできず...");
+    
+  }
+}
+        };
+
+        buttonRow.appendChild(
+          copyBtn
+        );
+
+        // ------------------
+        // いいね
+        // ------------------
+        const likeBtn =
+          document.createElement(
+            "button"
+          );
+
+        const likeKey =
+          "liked_" +
+          docSnap.id;
+
+        const alreadyLiked =
+          localStorage.getItem(
+            likeKey
+          );
+
+        likeBtn.textContent =
+          `❤️ ${post.likes}`;
+
+        if(alreadyLiked){
+          likeBtn.disabled =
+            true;
+
+          likeBtn.textContent =
+            `❤️ ${post.likes} 済`;
+        }
+
+        likeBtn.onclick =
+        async()=>{
+
+          if(
+            localStorage.getItem(
+              likeKey
+            )
+          ) return;
+
+          await updateDoc(
+            doc(
+              db,
+              "posts",
+              docSnap.id
+            ),
+            {
+              likes:
+              increment(1)
+            }
+          );
+
+          localStorage.setItem(
+            likeKey,
+            "1"
+          );
+
+          showToast(
+            "いいねしました"
+          );
+        };
+
+        buttonRow.appendChild(
+          likeBtn
+        );
+
+        // ------------------
+        // 削除
+        // ------------------
+        if(
+          post.uid ===
+          auth.currentUser.uid
+        ){
+
+          const deleteBtn =
+            document
+            .createElement(
+              "button"
+            );
+
+          deleteBtn.textContent =
+            "🗑削除";
+
+          deleteBtn.onclick =
+          async()=>{
+
+            const ok =
+              confirm(
+                "削除しますか？"
+              );
+
+            if(!ok) return;
+
+            await deleteDoc(
+              doc(
+                db,
+                "posts",
+                docSnap.id
+              )
+            );
+
+            showToast(
+              "削除しました"
+            );
+          };
+
+          buttonRow.appendChild(
+            deleteBtn
+          );
+        }
+
+        item.appendChild(
+          buttonRow
+        );
+
+        content.appendChild(
+          item
+        );
+
+      });
+
+    }
+  );
+}
+
+function resizeAndEncode(file) {
+  
+  return new Promise(
+    (resolve) => {
+      
+      const reader =
+        new FileReader();
+      
+      reader.onload = e => {
+        
+        const img =
+          new Image();
+        
+        img.onload = () => {
+          
+          let width =
+            img.width;
+          
+          let height =
+            img.height;
+          
+          const maxSize = 500;
+          
+          if (
+            width > maxSize ||
+            height > maxSize
+          ) {
+            
+            if (width > height) {
+              height =
+                height *
+                (maxSize / width);
+              
+              width =
+                maxSize;
+            } else {
+              width =
+                width *
+                (maxSize / height);
+              
+              height =
+                maxSize;
+            }
+          }
+          
+          const canvas =
+            document
+            .createElement(
+              "canvas"
+            );
+          
+          canvas.width =
+            width;
+          
+          canvas.height =
+            height;
+          
+          const ctx =
+            canvas
+            .getContext("2d");
+          
+          ctx.drawImage(
+            img,
+            0,
+            0,
+            width,
+            height
+          );
+          
+          const base64 =
+            canvas
+            .toDataURL(
+              "image/png",
+              0.8
+            );
+          
+          resolve(base64);
+        };
+        
+        img.src =
+          e.target.result;
+      };
+      
+      reader.readAsDataURL(
+        file
+      );
+    }
+  );
+}
+
+function renderContent(){
+
+  content.innerHTML="";
+
+  const cat=DATA[currentIndex];
+
+  const div=
+
+  document.createElement("div");
+
+  div.className="category";
+
+  div.style.background=
+
+    cat.boxStyle;
+
+  const h=
+
+  document.createElement("h2");
+
+// カスタムジャンルなら削除ボタン表示
+if (cat.custom) {
+  
+  const deleteBtn =
+    document.createElement("button");
+  
+  deleteBtn.textContent =
+    "このジャンルを削除する";
+  
+  deleteBtn.style.background =
+    "#ff4d4d";
+  
+  deleteBtn.style.color =
+    "white";
+  
+  deleteBtn.style.border =
+    "none";
+  
+  deleteBtn.style.borderRadius =
+    "10px";
+  
+  deleteBtn.style.marginBottom =
+    "15px";
+  
+  deleteBtn.onclick = () => {
+    
+    const ok = confirm(
+      "このジャンルを削除しますか？"
+    );
+    
+    if (!ok) return;
+    
+    DATA.splice(
+      currentIndex,
+      1
+    );
+    
+    currentIndex = 0;
+    
+    saveData();
+    
+    renderTabs();
+    
+    renderContent();
+    
+    showToast(
+      "ジャンルを削除しました"
+    );
+  };
+  
+  div.appendChild(
+    deleteBtn
+  );
+}
+
+  h.innerHTML=cat.title;
+
+  div.appendChild(h);
+
+  cat.items.forEach(data=>{
+
+    const item=
+
+    document.createElement("div");
+
+    item.className="item";
+
+    if(
+
+      typeof data==="string" ||
+
+      data.type==="text"
+
+    ){
+
+      const text=
+
+      typeof data==="string"
+
+      ? data
+
+      : data.value;
+
+      item.innerHTML=text;
+
+      item.onclick=()=>{
+
+        navigator.clipboard
+
+        .writeText(text);
+
+        showToast("文字をコピー");
+
+      };
+
+    }
+
+    if(data.type==="image"){
+
+      const img=
+
+      document.createElement("img");
+
+      img.src=data.src;
+
+      img.style.maxWidth="150px";
+
+      img.style.maxHeight="150px";
+
+      item.appendChild(img);
+
+      item.onclick=async()=>{
+
+        try{
+
+          const response=
+
+          await fetch(data.src);
+
+          const blob=
+
+          await response.blob();
+
+          await navigator
+
+          .clipboard.write([
+
+            new ClipboardItem({
+
+              [blob.type]:blob
+
+            })
+
+          ]);
+
+          showToast("画像をコピー");
+
+        }catch{
+
+          await navigator
+
+          .clipboard.writeText(
+
+            data.src
+
+          );
+
+          showToast(
+
+            "画像URLをコピー"
+
+          );
+
+        }
+
+      };
+
+    }
+
+    div.appendChild(item);
+
+  });
+
+  content.appendChild(div);
+loadFirebasePosts(cat.title);
+}
+
+function updatePostCategory() {
+  
+  const select =
+    document.getElementById(
+      "postCategory"
+    );
+  
+  select.innerHTML = "";
+  
+  DATA.forEach(cat => {
+    
+    const option =
+      document.createElement(
+        "option"
+      );
+    
+    // HTMLタグを除いた文字だけ
+    option.textContent =
+      cat.title.replace(
+        /<[^>]+>/g,
+        ""
+      );
+    
+    option.value =
+      option.textContent;
+    
+    select.appendChild(
+      option
+    );
+    
+  });
+}
+
+function renderTabs() {
+  
+  tabs.innerHTML = "";
+  
+  DATA.forEach((cat, index) => {
+    
+    const btn =
+      document.createElement("button");
+    
+    btn.className = "tabButton";
+    
+    // HTML反映
+    btn.innerHTML = cat.title;
+    
+    // 背景色・模様
+    btn.style.background =
+      cat.boxStyle;
+    
+    // 文字数でフォント縮小
+    const plainText =
+      btn.textContent || "";
+    
+    const len =
+      plainText.length;
+    
+    let size = 20;
+    
+    if (len > 6) size = 18;
+    if (len > 10) size = 16;
+    if (len > 16) size = 14;
+    if (len > 22) size = 12;
+    
+    btn.style.fontSize =
+      size + "px";
+    
+    // 選択中
+    if (index === currentIndex) {
+      btn.classList.add(
+        "active"
+      );
+    }
+    
+    btn.onclick = () => {
+      currentIndex = index;
+      renderTabs();
+      renderContent();
+    };
+    
+    tabs.appendChild(btn);
+    
+  });
+  
+  updatePostCategory();
+  
+}
+
+function showToast(
+  text="コピーしました"
+){
+  const toast=
+  document.getElementById(
+    "toast"
+  );
+
+  toast.textContent=text;
+  toast.style.display=
+    "block";
+
+  setTimeout(()=>{
+    toast.style.display=
+      "none";
+  },1000);
+}
+
+window.openCategoryModal = function() {
+  document
+    .getElementById(
+      "categoryModal"
+    )
+    .classList
+    .remove("hidden");
+}
+
+window.closeCategoryModal = function(){
+  document
+  .getElementById(
+    "categoryModal"
+  )
+  .classList
+  .add("hidden");
+}
+
+window.submitCategory = function(){
+
+  const title=
+  document
+  .getElementById(
+    "categoryNameInput"
+  )
+  .value
+  .trim();
+
+  const style=
+  document
+  .getElementById(
+    "categoryStyleInput"
+  )
+  .value
+  .trim();
+
+  if(!title) return;
+
+  DATA.push({
+    title:title,
+    boxStyle:
+      style || "#999",
+      custom: true,
+    items:[]
+  });
+
+  saveData();
+
+  renderTabs();
+
+  document
+  .getElementById(
+    "categoryNameInput"
+  ).value="";
+
+  document
+  .getElementById(
+    "categoryStyleInput"
+  ).value="";
+
+  closeCategoryModal();
+}
+
+content.addEventListener(
+  "click",
+  async (e) => {
+    
+    const btn =
+      e.target.closest(
+        "[data-delete-id]"
+      );
+    
+    if (!btn) return;
+    
+    const postId =
+      btn.dataset.deleteId;
+    
+    const ok =
+      confirm(
+        "削除しますか？"
+      );
+    
+    if (!ok) return;
+    
+    await deleteDoc(
+      doc(
+        db,
+        "posts",
+        postId
+      )
+    );
+    
+    showToast(
+      "削除しました"
+    );
+  }
+);
+
+renderTabs();
+renderContent();
+
+console.log("JS開始");
+</script>
+
+</body>
+</html>
