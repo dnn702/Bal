@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>GIFメーカー（可変フレーム）</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 20px;
+}
+
+.item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid #ccc;
+}
+
+input[type="number"] {
+  width: 100px;
+}
+</style>
+</head>
+<body>
+
+<h2>GIFメーカー</h2>
+
+<input type="file" id="fileInput" multiple accept="image/*">
+<button onclick="makeGif()">GIF作成</button>
+
+<div id="list"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
+<script>
+const list = document.getElementById("list");
+let items = [];
+
+document.getElementById("fileInput").addEventListener("change", function(e) {
+  for (let file of e.target.files) {
+    const reader = new FileReader();
+
+    reader.onload = function(ev) {
+      const img = new Image();
+      img.src = ev.target.result;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "item";
+
+      const thumb = document.createElement("img");
+      thumb.src = ev.target.result;
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.value = 200;
+      input.placeholder = "ms";
+
+      wrapper.appendChild(thumb);
+      wrapper.appendChild(input);
+
+      list.appendChild(wrapper);
+
+      items.push({ img, input });
+    };
+
+    reader.readAsDataURL(file);
+  }
+});
+
+function makeGif() {
+
+  const gif = new GIF({
+    workers: 2,
+    quality: 10
+  });
+
+  let loaded = 0;
+
+  items.forEach((item, i) => {
+    const img = new Image();
+    img.src = item.img.src;
+
+    img.onload = () => {
+
+      const delay = parseInt(item.input.value) || 100;
+
+      gif.addFrame(img, { delay });
+
+      loaded++;
+
+      if (loaded === items.length) {
+
+        gif.on("finished", function(blob) {
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "output.gif";
+          a.click();
+        });
+
+        gif.render();
+      }
+    };
+  });
+
+}
+</script>
+
+</body>
+</html>
