@@ -208,12 +208,14 @@ if (vertical > maxVertical) {
     
 }
 
-        let power =
-            Math.sqrt(
-                x*x +
-                y*y +
-                z*z - 9.8
-            );
+          let power =
+    Math.abs(
+        Math.sqrt(
+            x*x +
+            y*y +
+            z*z
+        ) - 9.8
+    );
 
         let shindo = "0";
 
