@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>簡易地震計</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    text-align:center;
+    margin-top:50px;
+}
+
+#shindo{
+    font-size:60px;
+    font-weight:bold;
+}
+
+#sdo{
+    font-size:60px;
+    font-weight:bold;
+}
+canvas {
+    border: 1px solid black;
+    width: 90%;
+    max-width: 800px;
+    height: 150px;
+    margin-bottom: 20px;
+}
+</style>
+
+</head>
+<body>
+
+<h1>簡易地震計</h1>
+
+<button onclick="startMotion()">
+開始
+</button>
+
+<button id="resetBtn">
+リセット
+</button>
+
+<br><br>
+
+<span id="sdo">
+震度<span id="shindo">0</span>
+</span>
+<h2>横揺れ</h2>
+<canvas id="horizontalCanvas" width="800" height="150"></canvas>
+
+<h2>縦揺れ</h2>
+<canvas id="verticalCanvas" width="800" height="150"></canvas>
+
+<div>
+    横揺れ最大:
+    <span id="maxHorizontal">0.00</span>
+</div>
+
+<div>
+    縦揺れ最大:
+    <span id="maxVertical">0.00</span>
+</div>
+<script>
+
+const levels = [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5弱",
+    "5強",
+    "6弱",
+    "6強",
+    "7"
+];
+
+const horizontalCanvas =
+    document.getElementById("horizontalCanvas");
+
+const verticalCanvas =
+    document.getElementById("verticalCanvas");
+
+const hctx =
+    horizontalCanvas.getContext("2d");
+
+const vctx =
+    verticalCanvas.getContext("2d");
+
+const horizontalData = [];
+const verticalData = [];
+
+const MAX_POINTS = 300;
+
+let maxHorizontal = 0;
+let maxVertical = 0;
+
+let maxLevelIndex = 0;
+let resetTimer = null;
+let started = false;
+
+function startMotion(){
+
+    if(started) return;
+
+    if(
+        typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function"
+    ){
+
+        DeviceMotionEvent.requestPermission()
+        .then(permission => {
+
+
+            if(permission === "granted"){
+                startSensor();
+            }else{
+                alert("モーションセンサーが許可されませんでした");
+            }
+
+        });
+
+    }else{
+
+        startSensor();
+
+    }
+}
+
+function updateShindo(nowShindo){
+
+    const currentIndex = levels.indexOf(nowShindo);
+
+    if(currentIndex > maxLevelIndex){
+
+        maxLevelIndex = currentIndex;
+
+        document.getElementById("shindo").textContent =
+            levels[maxLevelIndex];
+
+        clearTimeout(resetTimer);
+
+        resetTimer = setTimeout(() => {
+
+            maxLevelIndex = 0;
+
+            document.getElementById("shindo").textContent =
+                "0";
+
+        }, 60000);
+
+    }
+
+}
+
+function startSensor(){
+
+    if(started) return;
+
+    started = true;
+
+    window.addEventListener("devicemotion", e => {
+
+        let x = e.accelerationIncludingGravity?.x || 0;
+let y = e.accelerationIncludingGravity?.y || 0;
+let z = e.accelerationIncludingGravity?.z || 0;
+
+
+
+let horizontal =
+    Math.sqrt(x * x + y * y);
+
+let vertical =
+    Math.abs(z);
+
+horizontalData.push(horizontal);
+verticalData.push(vertical);
+
+if (horizontalData.length > MAX_POINTS) {
+    horizontalData.shift();
+}
+
+if (verticalData.length > MAX_POINTS) {
+    verticalData.shift();
+}
+
+if (horizontal > maxHorizontal) {
+    
+    maxHorizontal = horizontal;
+    
+    document.getElementById(
+            "maxHorizontal"
+        ).textContent =
+        maxHorizontal.toFixed(2);
+    
+}
+
+if (vertical > maxVertical) {
+    
+    maxVertical = vertical;
+    
+    document.getElementById(
+            "maxVertical"
+        ).textContent =
+        maxVertical.toFixed(2);
+    
+}
+
+        let power =
+            Math.sqrt(
+                x*x +
+                y*y +
+                z*z
+            );
+
+        let shindo = "0";
+
+        if(power > 35) shindo = "7";
+        else if(power > 30) shindo = "6強";
+        else if(power > 25) shindo = "6弱";
+        else if(power > 20) shindo = "5強";
+        else if(power > 15) shindo = "5弱";
+        else if(power > 10) shindo = "4";
+        else if(power > 7) shindo = "3";
+        else if(power > 4) shindo = "2";
+        else if(power > 2) shindo = "1";
+
+        updateShindo(shindo);
+
+    });
+
+}
+
+document
+.getElementById("resetBtn")
+.addEventListener("click", () => {
+
+    clearTimeout(resetTimer);
+
+    maxLevelIndex = 0;
+
+    document.getElementById("shindo").textContent =
+        "0";
+        
+        maxHorizontal = 0;
+maxVertical = 0;
+
+horizontalData.length = 0;
+verticalData.length = 0;
+
+document.getElementById("maxHorizontal")
+    .textContent = "0.00";
+
+document.getElementById("maxVertical")
+    .textContent = "0.00";
+
+});
+
+
+function drawWave() {
+    
+    drawCanvas(
+        hctx,
+        horizontalCanvas,
+        horizontalData
+    );
+    
+    drawCanvas(
+        vctx,
+        verticalCanvas,
+        verticalData
+    );
+    
+    requestAnimationFrame(drawWave);
+    
+}
+
+function drawCanvas(
+    ctx,
+    canvas,
+    data
+){
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+    
+    ctx.beginPath();
+
+ctx.moveTo(0, canvas.height / 2);
+ctx.lineTo(canvas.width, canvas.height / 2);
+
+ctx.stroke();
+
+ctx.beginPath(); // ←追加
+
+
+
+    const center =
+        canvas.height / 2;
+
+    for(
+        let i=0;
+        i<data.length;
+        i++
+    ){
+
+        let x =
+            i *
+            canvas.width /
+            MAX_POINTS;
+
+        let y =
+            center -
+            data[i] * 15;
+
+        if(i===0){
+
+            ctx.moveTo(x,y);
+
+        }else{
+
+            ctx.lineTo(x,y);
+
+        }
+
+    }
+
+    ctx.stroke();
+
+}
+
+drawWave();
+</script>
+
+</body>
+</html>
