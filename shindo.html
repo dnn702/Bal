@@ -52,7 +52,7 @@ function startSensor(){
         let y = e.accelerationIncludingGravity.y || 0;
         let z = e.accelerationIncludingGravity.z || 0;
 
-        let power = Math.sqrt(x*x + y*y + z*z);
+        let power = Math.sqrt(x*x + y*y + z*z) - 9.8;
 
         let shindo = 0;
 
