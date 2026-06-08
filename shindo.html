@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>簡易地震計</title>
+<style>
+body{
+    font-family:sans-serif;
+    text-align:center;
+    margin-top:50px;
+}
+#shindo{
+    font-size:60px;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<h1>簡易地震計</h1>
+
+<button onclick="startMotion()">
+開始
+</button>
+
+<div id="shindo">0</div>
+
+<script>
+
+function startMotion(){
+
+    if(typeof DeviceMotionEvent !== "undefined" &&
+       typeof DeviceMotionEvent.requestPermission === "function"){
+
+        DeviceMotionEvent.requestPermission()
+        .then(permission => {
+            if(permission === "granted"){
+                startSensor();
+            }
+        });
+
+    }else{
+        startSensor();
+    }
+}
+
+function startSensor(){
+
+    window.addEventListener("devicemotion", e => {
+
+        let x = e.accelerationIncludingGravity.x || 0;
+        let y = e.accelerationIncludingGravity.y || 0;
+        let z = e.accelerationIncludingGravity.z || 0;
+
+        let power = Math.sqrt(x*x + y*y + z*z);
+
+        let shindo = 0;
+
+        if(power > 35) shindo = "7";
+        else if(power > 30) shindo = "6強";
+        else if(power > 25) shindo = "6弱";
+        else if(power > 20) shindo = "5強";
+        else if(power > 15) shindo = "5弱";
+        else if(power > 10) shindo = "4";
+        else if(power > 7) shindo = "3";
+        else if(power > 4) shindo = "2";
+        else if(power > 2) shindo = "1";
+
+        document.getElementById("shindo").textContent = shindo;
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>
