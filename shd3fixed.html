@@ -168,9 +168,9 @@ function startSensor(){
 
     window.addEventListener("devicemotion", e => {
 
-        let x = e.accelerationIncludingGravity?.x || 0;
-let y = e.accelerationIncludingGravity?.y || 0;
-let z = e.accelerationIncludingGravity?.z || 0;
+    let x = e.acceleration?.x || 0;
+let y = e.acceleration?.y || 0;
+let z = e.acceleration?.z || 0;
 
 
 
