@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>簡易地震計</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    text-align:center;
+    margin-top:50px;
+    transition: background-color 0.5s;
+}
+
+#shindo{
+    font-size:60px;
+    font-weight:bold;
+}
+
+#sdo{
+    font-size:60px;
+    font-weight:bold;
+}
+canvas {
+    border: 1px solid black;
+    width: 90%;
+    max-width: 800px;
+    height: 150px;
+    margin-bottom: 20px;
+}
+</style>
+
+</head>
+<body>
+
+<h1>簡易地震計</h1>
+
+<button onclick="startMotion()">
+開始
+</button>
+
+<button id="resetBtn">
+リセット
+</button>
+
+<br><br>
+
+<span id="sdo">
+震度<span id="shindo">0</span>
+
+</span>
+<div>
+    
+    <span id="avgScoreValue">0.00</span>
+</div>
+
+<h2>横揺れ</h2>
+<canvas id="horizontalCanvas" width="800" height="150"></canvas>
+
+<h2>縦揺れ</h2>
+<canvas id="verticalCanvas" width="800" height="150"></canvas>
+
+<div>
+    横揺れ最大:
+    <span id="maxHorizontal">0.00</span>
+</div>
+
+<div>
+    縦揺れ最大:
+    <span id="maxVertical">0.00</span>
+</div>
+
+<button id="langBtn">
+English
+</button>
+
+<br><br>
+
+<img
+    id="shindoImage"
+    src="sd.png"
+    alt="震度説明"
+    style="max-width:90%;"
+>
+
+<script>
+
+let isEnglish = false;
+
+document.getElementById("langBtn")
+    .addEventListener("click", () => {
+        
+        isEnglish = !isEnglish;
+        
+        const img =
+            document.getElementById("shindoImage");
+        
+        const btn =
+            document.getElementById("langBtn");
+        
+        if (isEnglish) {
+            
+            img.src = "sd2.png";
+            
+            btn.textContent = "日本語";
+            
+        } else {
+            
+            img.src = "sd.png";
+            
+            btn.textContent = "English";
+            
+        }
+        
+    });
+
+const levels = [
+    "0",
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+    "XIII",
+    "XIV",
+    "XV",
+    "XVI",
+    "XVII",
+    "XVIII",
+    "XIX",
+    "20",
+    "21"
+];
+
+let lastHorizontal = null;
+let lastVertical = null;
+
+let displayedLevelIndex = 0;
+
+let currentAvgScore = 0;
+
+const recentScores = [];
+
+const horizontalCanvas =
+    document.getElementById("horizontalCanvas");
+
+const verticalCanvas =
+    document.getElementById("verticalCanvas");
+
+const hctx =
+    horizontalCanvas.getContext("2d");
+
+const vctx =
+    verticalCanvas.getContext("2d");
+
+const horizontalData = [];
+const verticalData = [];
+
+const MAX_POINTS = 300;
+
+let maxHorizontal = 0;
+let maxVertical = 0;
+
+let maxLevelIndex = 0;
+let resetTimer = null;
+let started = false;
+
+function startMotion(){
+
+    if(started) return;
+
+    if(
+        typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function"
+    ){
+
+        DeviceMotionEvent.requestPermission()
+        .then(permission => {
+
+
+            if(permission === "granted"){
+                startSensor();
+            }else{
+                alert("モーションセンサーが許可されませんでした");
+            }
+
+        });
+
+    }else{
+
+        startSensor();
+
+    }
+}
+
+function updateShindo(nowShindo) {
+    
+    const currentIndex =
+        levels.indexOf(nowShindo);
+    
+    if (currentIndex > displayedLevelIndex) {
+        
+        displayedLevelIndex =
+            currentIndex;
+        
+        document.getElementById(
+                "shindo"
+            ).textContent =
+            levels[displayedLevelIndex];
+        
+    }
+    
+}
+
+function startSensor(){
+   
+    if(started) return;
+
+    started = true;
+
+    window.addEventListener("devicemotion", e => {
+
+    let x = e.acceleration?.x || 0;
+let y = e.acceleration?.y || 0;
+let z = e.acceleration?.z || 0;
+
+
+
+let horizontal =
+    Math.sqrt(x * x + y * y);
+
+let vertical =
+    Math.abs(z);
+    
+    if (lastHorizontal === null) {
+    
+    lastHorizontal = horizontal;
+    lastVertical = vertical;
+    
+    return;
+}
+
+horizontalData.push(horizontal);
+verticalData.push(vertical);
+
+if (horizontalData.length > MAX_POINTS) {
+    horizontalData.shift();
+}
+
+if (verticalData.length > MAX_POINTS) {
+    verticalData.shift();
+}
+
+if (horizontal > maxHorizontal) {
+    
+    maxHorizontal = horizontal;
+    
+    document.getElementById(
+            "maxHorizontal"
+        ).textContent =
+        maxHorizontal.toFixed(2);
+    
+}
+
+if (vertical > maxVertical) {
+    
+    maxVertical = vertical;
+    
+    document.getElementById(
+            "maxVertical"
+        ).textContent =
+        maxVertical.toFixed(2);
+    
+}
+
+        let power =
+    Math.abs(
+        Math.sqrt(
+            x*x +
+            y*y +
+            z*z
+        )
+    );
+
+let movement =
+    Math.abs(horizontal - lastHorizontal)
+    +
+    Math.abs(vertical - lastVertical);
+
+
+
+let motionScore =
+    power * 2 +
+    movement;
+
+recentScores.push(motionScore);
+
+if(recentScores.length > 30){
+    recentScores.shift();
+}
+
+let avgScore =
+    recentScores.reduce(
+        (a,b)=>a+b,
+        0
+    ) / recentScores.length;
+
+currentAvgScore = avgScore;
+
+let shindo = "0";
+
+if(avgScore > 310) shindo = "21";
+else if(avgScore > 300) shindo = "20";
+else if(avgScore > 295) shindo = "XIX";
+
+else if(avgScore > 290) shindo = "XVIII";
+else if(avgScore > 280) shindo = "XVII";
+else if(avgScore > 270) shindo = "XVI";
+
+else if(avgScore > 260) shindo = "XV";
+else if(avgScore > 250) shindo = "XIV";
+else if(avgScore > 240) shindo = "XIII";
+
+else if(avgScore > 220) shindo = "XII";
+else if(avgScore > 190) shindo = "XI";
+else if(avgScore > 80) shindo = "X";
+else if(avgScore > 70) shindo = "IX";
+else if(avgScore > 58) shindo = "VIII";
+
+else if(avgScore > 19) shindo = "VII";
+else if(avgScore > 10) shindo = "VI";
+else if(avgScore > 6) shindo = "V";
+else if(avgScore > 4) shindo = "IV";
+else if(avgScore > 2.1) shindo = "III";
+else if(avgScore > 1.2) shindo = "II";
+else if(avgScore > 0.5) shindo = "I";
+console.log(power, movement, avgScore);
+
+document.getElementById("shindo")
+    .dataset.target = shindo;
+    
+updateShindo(shindo);
+updateBackground(shindo);
+    });
+    
+
+}
+
+document
+.getElementById("resetBtn")
+.addEventListener("click", () => {
+
+    clearTimeout(resetTimer);
+
+    maxLevelIndex = 0;
+
+    document.getElementById("shindo").textContent =
+        "0";
+        
+        document.body.style.backgroundColor = "white";
+        
+        document.getElementById(
+    "avgScoreValue"
+).textContent = "0.00";
+        
+        maxHorizontal = 0;
+maxVertical = 0;
+
+displayedLevelIndex = 0;
+currentAvgScore = 0;
+
+horizontalData.length = 0;
+verticalData.length = 0;
+
+document.getElementById("maxHorizontal")
+    .textContent = "0.00";
+
+document.getElementById("maxVertical")
+    .textContent = "0.00";
+    
+    lastHorizontal = 0;
+lastVertical = 0;
+
+recentScores.length = 0;
+
+});
+
+setInterval(() => {
+    
+    const targetIndex =
+        levels.indexOf(
+            document.getElementById("shindo")
+            .dataset.target || "0"
+        );
+    
+    if (displayedLevelIndex > targetIndex) {
+        
+        displayedLevelIndex--;
+        
+        document.getElementById(
+                "shindo"
+            ).textContent =
+            levels[displayedLevelIndex];
+        
+    }
+    
+}, 500);
+
+
+function drawWave() {
+    
+    drawCanvas(
+        hctx,
+        horizontalCanvas,
+        horizontalData
+    );
+    
+    drawCanvas(
+        vctx,
+        verticalCanvas,
+        verticalData
+    );
+    
+    requestAnimationFrame(drawWave);
+    
+}
+
+function drawCanvas(
+    ctx,
+    canvas,
+    data
+){
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+    
+    ctx.beginPath();
+
+ctx.moveTo(0, canvas.height / 2);
+ctx.lineTo(canvas.width, canvas.height / 2);
+
+ctx.stroke();
+
+ctx.beginPath(); // ←追加
+
+
+
+    const center =
+        canvas.height / 2;
+
+    for(
+        let i=0;
+        i<data.length;
+        i++
+    ){
+
+        let x =
+            i *
+            canvas.width /
+            MAX_POINTS;
+
+        let y =
+            center -
+            data[i] * 15;
+
+        if(i===0){
+
+            ctx.moveTo(x,y);
+
+        }else{
+
+            ctx.lineTo(x,y);
+
+        }
+
+    }
+
+    ctx.stroke();
+
+}
+
+function updateBackground(shindo) {
+  
+  let color = "white";
+  
+  switch (shindo) {
+    
+    case "I":
+      color = "#dff4ff"; // 薄い青
+      break;
+      
+    case "II":
+      color = "#bfe8ff"; // やや薄い青
+      break;
+      
+    case "III":
+      color = "#4da6ff"; // 青
+      break;
+      
+    case "IV":
+      color = "#00ffff"; // シアン
+      break;
+      
+    case "V":
+      color = "#90ee90"; // 薄い緑
+      break;
+      
+    case "VI":
+      color = "#7fff00"; // 黄緑
+      break;
+      
+    case "VII":
+      color = "#ffff00"; // 黄色
+      break;
+      
+    case "VIII":
+      color = "#ffa500"; // オレンジ
+      break;
+      
+    case "IX":
+      color = "#ff7f00"; // 橙色
+      break;
+      
+    case "X":
+      color = "#ff0000"; // 赤
+      break;
+      
+    case "XI":
+      color = "#ff4d88"; // 赤っぽいピンク
+      break;
+      
+    default:
+      
+      if (
+        shindo === "XII" ||
+        shindo === "XIII" ||
+        shindo === "XIV" ||
+        shindo === "XV" ||
+        shindo === "XVI" ||
+        shindo === "XVII" ||
+        shindo === "XVIII" ||
+        shindo === "XIX" ||
+        shindo === "20" ||
+        shindo === "21"
+      ) {
+        color = "#8000ff"; // 紫
+      }
+  }
+  
+  document.body.style.backgroundColor = color;
+}
+
+setInterval(() => {
+    
+    document.getElementById(
+            "avgScoreValue"
+        ).textContent =
+        currentAvgScore.toFixed(2);
+    
+}, 1000);
+
+drawWave();
+</script>
+
+</body>
+</html>
