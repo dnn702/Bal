@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>騒音レベル計</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    text-align:center;
+    margin-top:50px;
+    transition:0.3s;
+}
+
+#db{
+    font-size:60px;
+    font-weight:bold;
+}
+
+#level{
+    font-size:80px;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<h1>騒音レベル計</h1>
+
+<div id="db">0 dB</div>
+<div id="level">0</div>
+
+<script>
+
+const levelNames = [
+"0",
+"I","II","III","IV","V",
+"VI","VII","VIII","IX","X",
+"XI","XII","XIII","XIV","XV",
+"XVI","XVII","XVIII","XIX",
+"20","21"
+];
+
+function getColor(level){
+
+    if(level===0) return "#00aaff";
+
+    if(level<=5) return "#00cc44";
+
+    if(level<=10) return "#ffff00";
+
+    if(level<=15) return "#ff8800";
+
+    return "#ff0000";
+}
+
+function dbToLevel(db){
+
+    let lv = Math.floor(db / 5);
+
+    if(lv < 0) lv = 0;
+    if(lv > 21) lv = 21;
+
+    return lv;
+}
+
+navigator.mediaDevices.getUserMedia({audio:true})
+.then(stream=>{
+
+    const audioContext = new AudioContext();
+
+    const analyser = audioContext.createAnalyser();
+
+    const microphone =
+        audioContext.createMediaStreamSource(stream);
+
+    microphone.connect(analyser);
+
+    analyser.fftSize = 2048;
+
+    const data = new Uint8Array(analyser.fftSize);
+
+    function update(){
+
+        analyser.getByteTimeDomainData(data);
+
+        let sum = 0;
+
+        for(let i=0;i<data.length;i++){
+
+            let x = (data[i]-128)/128;
+
+            sum += x*x;
+        }
+
+        let rms = Math.sqrt(sum/data.length);
+
+        let db = Math.round(20 * Math.log10(rms) + 45);
+if (db < 0) db = 0;
+        if(!isFinite(db)) db = 0;
+        if(db < 0) db = 0;
+
+        const level = dbToLevel(db);
+
+        document.getElementById("db").textContent =
+            db + " dB";
+
+        document.getElementById("level").textContent =
+            levelNames[level];
+
+        document.body.style.backgroundColor =
+            getColor(level);
+
+        requestAnimationFrame(update);
+    }
+
+    update();
+})
+.catch(err=>{
+    alert("マイクの使用を許可してください");
+});
+
+</script>
+
+</body>
+</html>
