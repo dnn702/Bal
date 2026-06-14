@@ -101,8 +101,8 @@ navigator.mediaDevices.getUserMedia({
 
         let rms = Math.sqrt(sum/data.length);
 
-        let db = Math.round(20 * Math.log10(rms) + 55);
-if (db < 0) db = 0;
+        let db = Math.round(20 * Math.log10(rms) + 45);
+ if (db < 0) db = 0;
         if(!isFinite(db)) db = 0;
         if(db < 0) db = 0;
 
