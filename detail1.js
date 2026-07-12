@@ -95,13 +95,10 @@ function drawCost(value, elementId){
     for(const ch of text){
 
         const img = document.createElement("img");
-img.style.width = "33px";
-img.style.height = "33px";
+img.style.width = "28px";
+img.style.height = "auto";
 img.style.verticalAlign = "middle";
-
-
-img.style.marginLeft = "-11px";
-
+            
 
 
 
