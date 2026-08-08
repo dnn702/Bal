@@ -134,7 +134,7 @@ const fixedAvatars = [
      {
         id: "adminmonster",
         name: "ダイヤモンエナ",
-        image: "assets/avatar/adminmonster.png",
+        image: "assets/avatar/た.png",
         rare: 16,
         cool: 339358,
         cute: 212264,
