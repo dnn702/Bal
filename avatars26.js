@@ -131,7 +131,17 @@ const fixedAvatars = [
         likes: "umi000",
         bad: 0
     },
-    
+     {
+        id: "adminmonster",
+        name: "ダイヤモンエナ",
+        image: "assets/avatar/adminmonster.png",
+        rare: 16,
+        cool: 339358,
+        cute: 212264,
+        cost: 32,
+        likes: "9999",
+        bad: "なし"
+    },
     {
         id: "admin002",
         name: "テスト17",
