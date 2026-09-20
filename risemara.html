@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>現在地の雨ヤバさレベル</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        font-family: sans-serif;
+        background: #f2f2f2;
+        color: #222;
+    }
+
+    .container {
+        max-width: 700px;
+        margin: auto;
+        padding: 20px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .status {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+        margin-bottom: 20px;
+    }
+
+    #levelBox {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        margin: 20px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        border: 5px solid #333;
+    }
+    
+    .rainbow {
+    background: linear-gradient(
+        135deg,
+        red,
+        orange,
+        yellow,
+        lime,
+        cyan,
+        blue,
+        violet
+    );
+}
+
+    #levelNumber {
+        font-size: 60px;
+        font-weight: bold;
+    }
+
+    #levelText {
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    #rainAmount {
+        font-size: 22px;
+        margin: 10px;
+    }
+
+    #location {
+        color: #666;
+        margin-top: 10px;
+    }
+
+    button {
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background: #1976d2;
+        color: white;
+    }
+
+    button:hover {
+        opacity: 0.85;
+    }
+
+    .table-box {
+        background: white;
+        border-radius: 15px;
+        padding: 15px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        text-align: center;
+    }
+
+    th {
+        background: #eee;
+    }
+
+    .color-box {
+        width: 35px;
+        height: 25px;
+        margin: auto;
+        border: 1px solid #777;
+    }
+
+    .current-row {
+        font-weight: bold;
+        outline: 3px solid #333;
+    }
+
+    .error {
+        color: #d00000;
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🌧️ 現在地の雨ヤバさレベル</h1>
+
+    <div class="status">
+
+        <div id="levelBox">
+            <div id="levelNumber">-</div>
+            <div id="levelText">取得中</div>
+        </div>
+
+        <div id="rainAmount">
+            降水量：取得中
+        </div>
+
+        <div id="location">
+            現在地を取得しています...
+        </div>
+
+        <br>
+
+        <button onclick="getWeather()">
+            📍 現在地を更新
+        </button>
+
+        <p id="error" class="error"></p>
+
+    </div>
+
+
+    <div class="table-box">
+
+        <h2>🌧️ 雨ヤバさレベル表</h2>
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Lv</th>
+                    <th>色</th>
+                    <th>1時間降水量</th>
+                </tr>
+            </thead>
+
+            <tbody id="levelTable">
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<script>
+
+// ================================
+// 雨レベル設定
+// ================================
+
+const levels = [
+
+    {
+        level: 1,
+        min: 0,
+        max: 0.1,
+        color: "#ffffff",
+        name: "ほぼ雨なし"
+    },
+
+    {
+        level: 2,
+        min: 0.1,
+        max: 0.5,
+        color: "#87CEFA",
+        name: "弱い雨"
+    },
+
+    {
+        level: 3,
+        min: 0.5,
+        max: 1,
+        color: "#0000ff",
+        name: "小雨"
+    },
+
+    {
+        level: 4,
+        min: 1,
+        max: 2,
+        color: "#00a000",
+        name: "普通の雨"
+    },
+
+    {
+        level: 5,
+        min: 2,
+        max: 5,
+        color: "#9acd32",
+        name: "やや強い雨"
+    },
+
+    {
+        level: 6,
+        min: 5,
+        max: 10,
+        color: "#ffff00",
+        name: "強めの雨"
+    },
+
+    {
+        level: 7,
+        min: 10,
+        max: 20,
+        color: "#e5a100",
+        name: "かなり強い雨"
+    },
+
+    {
+        level: 8,
+        min: 20,
+        max: 30,
+        color: "#ff8800",
+        name: "強い雨"
+    },
+
+    {
+        level: 9,
+        min: 30,
+        max: 50,
+        color: "#ff0000",
+        name: "非常に強い雨"
+    },
+
+    {
+        level: 10,
+        min: 50,
+        max: 80,
+        color: "#8b0000",
+        name: "猛烈な雨"
+    },
+
+    {
+        level: 11,
+        min: 80,
+        max: 100,
+        color: "#800080",
+        name: "極端な雨"
+    },
+
+    {
+        level: 12,
+        min: 100,
+        max: 150,
+        color: "#301934",
+        name: "超猛烈な雨"
+    },
+
+    {
+        level: 13,
+        min: 150,
+        max: 200,
+        color: "#000000",
+        name: "極限の雨"
+    },
+    
+    {
+    level: 14,
+    min: 200,
+    max: 300,
+    color: "#000000",
+    name: "ヤバい",
+    image: "https://media.timeout.com/images/105736729/750/422/image.jpg"
+},
+
+{
+    level: 15,
+    min: 300,
+    max: Infinity,
+    color: null,
+    name: "超ヤバい"
+}
+
+];
+
+
+// ================================
+// レベル表を作成
+// ================================
+
+function createTable() {
+
+    const table = document.getElementById("levelTable");
+
+    table.innerHTML = "";
+
+    levels.forEach(item => {
+
+        const tr = document.createElement("tr");
+
+        tr.id = "row-" + item.level;
+
+        const maxText =
+            item.max === Infinity
+            ? "300 mm以上"
+            : `${item.min} ～ ${item.max} mm`;
+
+        tr.innerHTML = `
+            <td>${item.level}</td>
+
+            <td>
+                <div
+                    class="color-box"
+                    style="${item.level === 14
+    ? `background-image:url('${item.image}');background-size:cover;background-position:center;`
+    : item.level === 15
+        ? `background:linear-gradient(135deg,red,orange,yellow,lime,cyan,blue,violet);`
+        : `background:${item.color};`
+}">
+                </div>
+            </td>
+
+            <td>${maxText}</td>
+        `;
+
+        table.appendChild(tr);
+
+    });
+
+}
+
+
+// ================================
+// 雨量 → レベル変換
+// ================================
+
+function getRainLevel(rain) {
+
+    for (const item of levels) {
+
+        if (
+            rain >= item.min &&
+            rain < item.max
+        ) {
+            return item;
+        }
+
+    }
+
+    return levels[levels.length - 1];
+
+}
+
+
+// ================================
+// 現在地取得
+// ================================
+
+function getWeather() {
+
+    const error = document.getElementById("error");
+
+    error.textContent = "";
+
+    if (!navigator.geolocation) {
+
+        error.textContent =
+            "このブラウザでは現在地取得に対応していません。";
+
+        return;
+
+    }
+
+    document.getElementById("location").textContent =
+        "現在地を取得しています...";
+
+    navigator.geolocation.getCurrentPosition(
+
+        position => {
+
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            getRainData(lat, lon);
+
+        },
+
+        err => {
+
+            console.error(err);
+
+            error.textContent =
+                "現在地を取得できませんでした。位置情報の許可を確認してください。";
+
+        },
+
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000
+        }
+
+    );
+
+}
+
+
+// ================================
+// Open-Meteoから雨量取得
+// ================================
+
+async function getRainData(lat, lon) {
+
+    try {
+
+        const url =
+            `https://api.open-meteo.com/v1/forecast` +
+            `?latitude=${lat}` +
+            `&longitude=${lon}` +
+            `&current=precipitation` +
+            `&timezone=auto`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("API Error");
+        }
+
+        const data = await response.json();
+
+        const rain =
+            Number(data.current.precipitation || 0);
+
+        showResult(rain, lat, lon);
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        document.getElementById("error").textContent =
+            "雨量データの取得に失敗しました。";
+
+    }
+
+}
+
+
+// ================================
+// 結果表示
+// ================================
+
+function showResult(rain, lat, lon) {
+
+    const item = getRainLevel(rain);
+
+    const box = document.getElementById("levelBox");
+
+    if (item.level === 14) {
+    box.style.backgroundImage = "url('14.png')";
+    box.style.backgroundSize = "cover";
+    box.style.backgroundPosition = "center";
+}
+else if (item.level === 15) {
+    box.style.backgroundImage =
+        "linear-gradient(135deg, red, orange, yellow, lime, cyan, blue, violet)";
+}
+else {
+    box.style.backgroundImage = "none";
+    box.style.background = item.color;
+}
+    // 黒・濃色の場合は文字を白にする
+    if (
+        item.level >= 10
+    ) {
+        box.style.color = "white";
+    }
+    else {
+        box.style.color = "black";
+    }
+
+    document.getElementById("levelNumber").textContent =
+        item.level;
+
+    document.getElementById("levelText").textContent =
+        item.name;
+
+    document.getElementById("rainAmount").textContent =
+        `1時間降水量：約 ${rain} mm`;
+
+    document.getElementById("location").textContent =
+        `現在地：緯度 ${lat.toFixed(4)} / 経度 ${lon.toFixed(4)}`;
+
+    // 表の現在レベルを強調
+    levels.forEach(level => {
+
+        const row =
+            document.getElementById("row-" + level.level);
+
+        if (level.level === item.level) {
+
+            row.classList.add("current-row");
+
+        }
+        else {
+
+            row.classList.remove("current-row");
+
+        }
+
+    });
+
+}
+
+
+// ================================
+// 初期化
+// ================================
+
+createTable();
+
+getWeather();
+
+</script>
+
+</body>
+</html>
