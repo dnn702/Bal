@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Idle Balls風ゲーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --bg:#111214;
+  --panel:#303032;
+  --panel2:#252527;
+  --panel3:#3a3a3c;
+  --text:#f4f4f4;
+  --muted:#9a9a9d;
+  --cyan:#20d8d2;
+  --yellow:#ffd21c;
+  --green:#1cff45;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#111214;color:var(--text);font-family:Arial,"Noto Sans JP",sans-serif;overflow-x:hidden}
+body{width:100%;min-height:100vh}
+button{font:inherit}
+#app{width:100%;max-width:760px;margin:0 auto;background:#111214;min-height:100vh}
+#hud{
+  height:145px;background:#3a3a3c;display:flex;align-items:center;
+  justify-content:space-between;padding:16px 16px 14px;gap:10px;
+}
+.level-area{flex:1;min-width:0}
+.top-stats{display:flex;align-items:baseline;gap:12px;min-width:0;white-space:nowrap}
+.level-label{font-size:28px;line-height:1;font-weight:300;white-space:nowrap}
+.level-label #stn{font-size:52px;color:#ffd21c;margin:0 2px;display:inline}
+.points-label{font-size:16px;color:#d6d6d8;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#pointsHud{font-size:18px;color:#fff;font-weight:700}
+.level-progress{height:17px;background:#050505;border:2px solid #050505;border-radius:7px;overflow:hidden;margin-top:13px}
+#levelProgressFill{height:100%;width:35%;background:#ffd21c;transition:width .15s linear}
+#collectButton{
+  width:122px;min-width:108px;height:86px;border:0;border-radius:14px;
+  background:#1dd7d2;color:#101010;box-shadow:0 3px 0 rgba(0,0,0,.25);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+#collectButton .collect-title{font-size:25px;line-height:1.05}
+#collection{font-size:23px;font-weight:700;margin-top:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 6px}
+#collectButton:active{transform:scale(.985)}
+#collectButton.empty{filter:saturate(.65);opacity:.82}
+
+#game{
+  position:relative;width:100%;height:calc(100vh - 495px);min-height:610px;
+  background:#000;overflow:hidden;
+}
+.circle{
+  position:absolute;width:74px;height:74px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#111;
+  font-weight:500;font-size:17px;user-select:none;cursor:pointer;
+  contain:layout paint style;box-shadow:none;
+  transform-origin:center center;
+  opacity:0;transform:scale(.06);
+  will-change:transform,opacity;
+  pointer-events:auto;
+}
+.circle.circle-dead{
+  display:none !important;
+  pointer-events:none;
+}
+
+.ball{
+  position:absolute;width:27px;height:27px;border-radius:50%;
+  will-change:transform;contain:layout paint style;z-index:4;
+  border:2px solid rgba(255,255,255,.3);
+  filter:brightness(1.12);
+}
+.ball.prestige-ball{width:31px;height:31px;border-color:rgba(255,255,255,.65);z-index:5}
+.ball::before{
+  content:"";position:absolute;inset:-12px;border-radius:50%;
+  background:inherit;filter:blur(11px);opacity:.75;z-index:-1;
+}
+.ball::after{
+  content:"";position:absolute;inset:-4px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.95) 0 8%,rgba(255,255,255,.18) 22%,transparent 55%);
+  pointer-events:none;
+}
+
+#bottomPanel{background:#38383a}
+#menuBar{
+  height:70px;background:#363638;display:flex;align-items:stretch;
+  overflow-x:auto;white-space:nowrap;scrollbar-width:none;
+  border-top:1px solid #424244;border-bottom:1px solid #171718;
+}
+#menuBar::-webkit-scrollbar,#ballUpgrades::-webkit-scrollbar,#prestigeUpgrades::-webkit-scrollbar{display:none}
+.menu-item{
+  flex:0 0 auto;min-width:155px;padding:18px 24px 14px;border:0;background:transparent;
+  color:#99999c;font-size:24px;cursor:pointer
+}
+.menu-item.active{background:#444446;color:#fff;border-radius:12px 12px 0 0}
+.menu-spacer{flex:1;min-width:8px}
+#settingsButton{min-width:72px;font-size:35px;padding:8px 15px}
+
+.section{display:none;background:#303032;padding:0 0 18px}
+.section.active{display:block}
+.scroller{
+  display:flex;gap:10px;overflow-x:auto;white-space:nowrap;
+  padding:10px 8px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+}
+.card{
+  flex:0 0 178px;width:178px;height:310px;background:#242426;border-radius:8px;
+  padding:12px 8px 9px;text-align:center;display:flex;flex-direction:column;
+  justify-content:space-between;scroll-snap-align:start;box-shadow:0 2px 0 #181819;
+}
+.card-title{font-size:22px;color:#f1f1f1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-icon{
+  width:96px;height:96px;border-radius:50%;background:#000;margin:0 auto;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+}
+.card-icon .mini-ball{width:62px;height:62px;border-radius:50%;box-shadow:0 0 18px currentColor}
+.card-stat{font-size:21px;color:#77777b;min-height:28px}
+.card-action{
+  width:100%;height:62px;border:0;border-radius:9px;background:#8fe1c8;color:#161616;
+  font-size:21px;cursor:pointer;white-space:normal
+}
+.card-action.locked{background:#a4a4a7}
+.card-action:disabled{opacity:.7;cursor:default}
+.card-action.affordable{background:#35d76f}
+.lock{font-size:28px;margin-right:8px;vertical-align:-3px}
+.section-title{font-size:18px;color:#a8a8aa;padding:12px 14px 2px}
+.prestige-card .card-icon .mini-ball{box-shadow:0 0 22px currentColor}
+.prestige-card{height:330px}
+#infoArea{display:none}
+#saveStatus{color:#aaa;font-size:12px}
+.settings-panel{padding:12px;background:#303032;display:flex;gap:8px;overflow-x:auto}
+.settings-panel button{flex:0 0 auto;border:0;border-radius:8px;padding:10px 15px;background:#555;color:#fff}
+.hidden{display:none!important}
+@media(max-width:600px){
+  #hud{height:145px;padding:16px 12px;gap:8px}
+  .top-stats{gap:7px}
+  .level-label{font-size:22px}
+  .level-label #stn{font-size:43px}
+  .points-label{font-size:13px}
+  #pointsHud{font-size:30px}
+  #collectButton{width:112px;min-width:102px;height:82px}
+  #collectButton .collect-title{font-size:23px}
+  #collection{font-size:21px}
+  #game{height:calc(100vh - 495px);min-height:560px}
+  .menu-item{min-width:150px;font-size:23px}
+  .card{flex-basis:180px;width:180px}
+}
+</style>
+
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="level-area">
+      <div class="top-stats">
+        <div class="level-label">レベル <span id="stn">1</span></div>
+        
+      </div>
+      <div class="level-progress"><div id="levelProgressFill"></div></div>
+    </div>
+    <button id="collectButton" onclick="collectToPoints()" aria-label="収集をポイントに変換">
+      <div class="collect-title">収集</div>
+      <div id="collection">0</div>
+    </button>
+    
+  </header>
+  <div class="points-label">ポイント <span id="pointsHud">0</span></div>
+<p id="mo"><button onclick="tupd()">MOD</button></p>
+<button onclick="tupdp()">MO</button>
+<button onclick="tupdpp()">た</button>
+<button onclick="tupdsd()">B</button>
+<button onclick="tupdst()">タップ攻撃力リセット</button>
+  <main id="game"></main>
+
+  <section id="bottomPanel">
+    <nav id="menuBar">
+      <button class="menu-item active" data-tab="ballsTab">ボール</button>
+      <button class="menu-item" data-tab="prestigeTab">Prestige</button>
+      <button class="menu-item" id="settingsButton" data-tab="settingsTab">⚙</button>
+    </nav>
+
+    <section id="ballsTab" class="section active">
+      <div class="section-title">ボール</div>
+      <div id="ballUpgrades" class="scroller"></div>
+    </section>
+
+    <section id="prestigeTab" class="section">
+      <div class="section-title">Prestige</div>
+      <div id="prestigeUpgrades" class="scroller"></div>
+    </section>
+
+    <section id="settingsTab" class="section">
+      <div class="section-title">設定・セーブ</div>
+      <div class="settings-panel">
+        <button onclick="saveGame()">💾 セーブ</button>
+        <button onclick="loadGame()">↩ ロード</button>
+        <button onclick="resetGame()">🗑 リセット</button>
+        <span id="saveStatus"></span>
+      </div>
+    </section>
+  </section>
+
+  <div id="infoArea">
+    <div id="points"></div><div id="ballInfo"></div>
+  </div>
+</div>
+<script>
+    const ATTACK_NUM = 3n, ATTACK_DEN = 2n;
+    const COST_NUM = 17n, COST_DEN = 10n;
+    let points = 10n ** 9000n;
+    let collection = 0n;
+    let stage = 1n;
+    let circles = [];
+    let balls = [];
+    let tapAttack = 1n;
+    let tapCost = 0n;
+
+    const UNITS = (() => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz';
+      const u = ['', 'k', 'm', 'b', 't', 'q', 'Q', 'u', 'U', 's', 'S', 'o', 'O', 'n', 'd', 'D', 'p', 'P', 'g', 'G', 'h', 'H', 'l', 'L', 'i', 'I', 'j', 'J', 'n', 'N', 'c', 'C', 'v', 'V', 'w', 'W', 'x',
+      'X', 'y', 'Y', 'z', 'Z', 'vv', 'VV', 'ww', 'WW', 'xx', 'XX', 'yy', 'YY', 'zz', 'ZZ', 'Xt', 'Wt', 'xt', 'yt', 'zt', 'xp', 'yp', 'zp', 'xc', 'yc', 'zc', 'xg', 'yg', 'zg', 'wX', 'Vh', 'Ih', 'xk', 'yk', 'zk', 'xe',
+      'ye', 'ze', 'xr', 'yr', 'zr',  'Xp', 'Yp', 'Zp', 'Xc', 'Yc', 'Zc', 'Xg', 'Yg', 'Zg', 'Xk', 'Yk', 'Zk', 'Xe', 'Ye', 'Ze', 'Xr', 'Yr', 'Zr', 'xj', 'Xj', 'XJ', 'yj', 'Yj', 'YJ', 'zj',
+      'Zj', 'ZJ', 'nj', 'ajj', 'Aj', 'xu', 'Xu', 'XU', 'yu', 'Yu', 'YU', 'zu', 'Zu', 'ZU', 'tx', 'ty', 'tz', 'tX', 'tY', 'tZ', 'TX', 'TY', 'TZ', 'Xx', 'Yy', 'Zz', 'xX', 'yY', 'zZ', 'xy',
+      'yx', 'Xy', 'Yx', 'xY', 'yX', 'XY', 'YX', 'xz', 'zx', 'Xz', 'Zx', 'xZ', 'zX', 'XZ', 'ZX', 'zy', 'yz', 'Zy', 'Yz', 'zY', 'yZ', 'ZY', 'YZ', 'Gxz', 'ugxz', 'dgxz', 'tgxz', 'qgxz', 'Qgxz', 'sgxz', 'Sgxz', 'ogxz', 'ngxz', 'Dgxz', 'vgxz', 'Tgxz', 'qGxz',
+      'QGxz', 'sGxz', 'SGxz', 'Ogxz', 'Ngxz', 'dGxz', 'tGxz', 'qGXz', 'QGXz', 'sGXz', 'SGXz', 'oGxz', 'nGxz', 'ygxz', 'Ygxz', 'Igxz', 'Vgxz', 'Bgxz', 'SGXZ', 'OGxz', 'NGxz', 'NGXz', 'cgxz', 'Cgxz', 'CGxz', 'CGXz', 'Nx', 'Ny', 'Nz', 'NX', 'NY', 'NZ', 'xq', 'yq', 'zq', 'Xq', 'Yq', 'Zq', 'xQ', 'yQ', 'zQ', 'XQ', 'YQ', 'ZQ',
+      'x+', 'X+', 'y+', 'Y+', 'z+', 'Z+', 'v+', 'V+', 'w+', 'W+', 'Vg', 'Ce', 'Hx', 'Hy', 'Hz', 'Mx', 'My', 'Mz', 'HX', 'HY', 'HZ', 'MX', 'MY', 'MZ', 'iix', 'iiy', 'iiz', 'IIx', 'IIy', 'IIz', 'iiX', 'iiY', 'iiZ', 'iIx', 'iIy', 'iIz', 'Iix', 'Iiy',
+      'Iiz', 'iIX', 'iIY', 'iIZ', 'IiX', 'IiY', 'IiZ', 'IIX', 'IIY', 'IIZ', 'xxx', 'yyy', 'zzz', 'XXX', 'YYY', 'ZZZ', 'xxxx', 'yyyy', 'zzzz', 'XXXX', 'YYYY', 'ZZZZ', 'wxyz', 'WXYZ', 'Zpt', 'uzpt', 'dzpt', 'tzpt', 'qzpt', 'Qzpt', 'szpt', 'Szpt', 'ozpt', 'nzpt', 'Dzpt', 'vzpt', 'Tzpt',
+      'qZpt', 'QZpt', 'sZpt', 'SZpt', 'Ozpt', 'Nzpt', 'xzpt', 'Xzpt', 'yzpt', 'Yzpt', 'zzpt', 'Zzpt', 'mzpt', 'Mzpt', 'bzpt', 'Bzpt', 'gzpt', 'Gzpt', 'hzpt', 'Hzpt', 'izpt', 'Izpt', 'iZpt', 'IZpt', 'hZpt', 'HZpt', 'jzpt', 'Jzpt', 'lzpt', 'Lzpt', 'wzpt', 'Wzpt',
+      'Vzpt', 'VZpt', 'dZpt', 'tZpt', 'qZPt', 'QZPt', 'sZPt', 'SZPt', 'oZpt', 'nZpt', 'czpt', 'Czpt', 'Cez', 'CeZ', 'vb', 'Vb', 'vB', 'VB', 'bB', 'Bb', 'BB', 'nb', 'Nb', 'nB', 'NB', 'k2', 'm2', 'b2', 't2', 'q2', 'Q2', 's2',
+      'S2', 'o2', 'n2', 'd2', 'ud2', 'dd2', 'td2', 'qd2', 'Qd2', 'sd2', 'Sd2', 'od2', 'nd', 'v2', 'vG', 'VG', 'ig', 'Ig', 'iG', 'IG', 'wg', 'Wg', 'wG', 'WG', 'X', 'Y', 'Z','!', '!!', '!!!', '!!!!', '!!!!!', '?', '??', '???', '????', '?????', '!!?',
+      '?!!', '??!', '!??', '!?!', '?!?', '!?', '?!', '!!!', '???', 'Gc', 'CC', 'ZN', 'Un', 'Ad', '□', '■', '○', '●', '◇', '◆', '△', '▲', '▽', '▼', '▦', '∞', 'XS', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅', '♕', '♛', '♖', '♜', '♗', '♝', '♘', '♞', '♙', '♟', '☠', '☻', '★', '✫', '☰', '☷', '☲', '☵',
+      '☶', '☳', '☴', '☱', '☩', '⇔', '✤', '✿', '❀', '𖡗', 'ꕥ', '╬', '∵', 'Zz', 'Qd', 'Qi', 'LL', 'WW', 'XC', 'DD', 'iii', 'III', 'UU', 'Yn', 'Vi', 'あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'pO', 'HW', 'EE', 'Gt', '∆', '©', '〄', 'JN', 'D○', '◘', '◘◘', '◘◘◘',
+      'BY', 'Yy', 'NL', 'UI', 'IU', 'gS', 'n', 'N', 'iO', 'Gh', '∫', '∬', '∫∫', '₪', '¤', '₠', '✡', '✣', '✾', '❆', '✳', '♡', '♤', '♢', '♧', '◎', '✖', '◐', '◑', '✐', 'ღ', '✆', '♯', '☼', '®', 'š', 'Š', '֍', '֎', 'ଞ', 'JJ', 'VIC', 'H!', 'N!', 'U!', '⣿',
+      '⧇', '⧺', '⧻', 'CCC', '࿊', '࿋', '࿌', '⧲', '⧳', '⨌', '⨕', '⨖', '⨘', '⨷', '⨸', '⩨', '⩩', '▢', '▤', '▥', '▧', '▨', '▩', '◙', '◚', '◛', '◴', '◵', '◶', '◷', '☪', '☫', '☬', '☹', '𐄡', '𐄠', '𐄪', 'XP', 'XD', 'XYZ', '𐇛', '𐜕', '𓐂', '𓐋', '𓐁', '𓏿', '𔘳', '𔘒', '𔗲', '𔗢', '𔗠', '𔗡', '𔗪', '𔗬', '𖦘', '𖦧', '𖥸', '𖥟', '𖤓', '𖤅', '𖣘', '𖣐', 
+      '𖣥', '𖢰', '𖢫', '𖫤', '𖫖', '𖬻', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'ゐ', 'ゔ', 'ゑ', 'を',
+      'ん', 'が', 'ぎ', 'ぐ', 'げ', 'ご', 'ざ', 'じ', 'ず', 'ぜ', 'ぞ', 'だ', 'ぢ', 'づ', 'で', 'ど', 'ば', 'び', 'ぶ', 'べ', 'ぼ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'っ', 'ゃ', 'ゅ', 'ょ', 'YS', 'ZS', 'NNN',
+      'NNP', 'DX', 'BTS', 'STB', 'NOT', '🀆', '🀑', '🀒', '🀓', '🀔', '🀕', '🀖', '🀗', '🀘', '🀫', '🀙', '🀚', '🀛', '🀜', '🀝', '🀞', '🀟', '🀠', '🀡', '🀆🀆', '🀠🀠', '🀦',  '🀧', '🀨', '🀩', 'ABC', '私組絵', 'ↀ', 'ↁ', 'ↂ', 'ↇ', 'ↈ', '⇪', '⇫', '⇬', '⇭', '⇮', '≈', '≉', '≋', '≍', '≎', '≑', '≒', '≓', '≖', '≡', '≣', '≠', '≭', '⊞', '⊕', '⊖', '⊗', '⊘', '⊙'
+      , '⊚', '⊜', '⊟', '⊠', '⊡', '⋒', '⋓', '⋕', '⋇', '⋮', '⌸', '⌹', '⌺', '⌻', '⌼', '⌽', '⌾', '⍁', '⍂', '⍇', '⍈', '⍌', '⍍', '⍉', '⍣', '⍤', '⍠', '⍟', '⍯', '⎕', '⎈', '⎅', '⎃', '⎂', '⏭', '⏩', '⏪', '⏫', '⏬', '␀', '␁', '␂', '␃', '␄', '␢', '␦', '␤', '␥', '⑀', '⑁', '⑂', '⑃', '⑄',
+      '⑅', '⑆', '⑇', '⑊', '⑈', '⑉', '╳', '▀', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '▐', '░', '▒', '▓', '▔', '▖', '▘', '▙', '▟', '▞', '▚', '▛', '▜', '☦', '☘', '☤', '☣', '☢', '♳', '♴', '♵', '♶', '♷', '♸', '♹', '♺', '♲', '♻', '♽', '♼', '♾', '⚆', '⚇', '⚈', '⚉', '⚊', '⚋', '⚌', '⚍', '⚎', '⚏', '⚒', '⚔',
+      '⚕', '⚖', '⚙', '⚚', '⚛', '⚜', '⚝', '⚠', '⚡', '⚢', '⚣', '⚤', '⚥', '⚦', '⚧', '⚨', '⚩', '⚭', '⚮', '⚯', '⛀', '⛁', '⛂', '⛃', '⛆', '⛇', '⛒', '⛋', '⛌', '⛏', '⛐', '⛓', '⛕', '⛗', '⛖', '⛘', '⛚', '⛛', '⛜', '⛝', '⛞', '⛟', '⛠', '⛡', '⛢', '⛣', '⛤', '⛥', '⛦', '⛧', '⛨', '⛩', '⛫', '⛬', '⛭', '⛮', '⛯', '⛰', '⛷',
+      '⛴', '⛶', '⛹', '⛸', '⛼', '⛻', '⛾', '⛿', '✂', '✄', '✑', '✒', '✶', '✷', '✸', '✹', '✺', '✻', '✼', '✽', '✾', '❁', '❂', '❃', '❅', '❆', '❇', '❈', '❉', '❊', '❋', '❍', '❏', '❐', '❑', '❒', '❖', '❘', '❙', '❚', '❝', '❞', '❢', '❣', '❥', '❦', '❧',
+      '➘', '➙', '➚', '➛', '➜', 'HJ', 'YO', 'RS', 'n', 'N', 'CC', 'hU', 'yB', 'Tc', '∝', '∽', '𐂠', 'ᯓ', '𓇢', '​ஜ', 'uM', 'IS', 'SI', 'i!', 'I!', 'NG', 'Job', 'Kg', 'Ks', 'Rd', 'nd', 'ynD', '§', '√', '𐂗', '𐂞', '𐂜', '𐂘', '𐂬', '𐄙',
+      '𐄚', '𐄛', '𐄜', '𐄝', '𐄞', '𐄟', '𐄠', '𐄡', '𐄢', '𐄣', '𐄤', '𐄥', '𐄦', '𐄧', '𐄨', '𐄩', '𐄪', '𐄫', '𐄬', '𐄭', '𐄮', '𐄯', '𐄰', '𐄱', '𐄲', '𐄳', '𐄺', '𐇣', '𐇤', '𐇧', '𐇐', '𐇵', '𑄣', '𑄦', '𑄠', '𑄊', '𑄇', '𑃳', '𑃰', '𖥹', '𖥗', '𖥚', '𖤼', '𖣯', '𖣯𖣯', '𖥚𖥚', 'HO', '𖥗𖥗', '𖥚𖣯', '𖥗!', '!!!!', '‽', '¡!', '!¡', '¡?',
+      '‽!', '¿?', '!‽', '?¿', '死', '墓', 'やだ', '菓子', 'n', 'N', 'Fz', 'zF', 'fZ', 'Zf', 'i!i', 'uX', '何', 'ǅ', 'ŵ', 'Ŵ', 'Œ', 'ũ', 'Ũ', 'ū', 'Ū', 'ŭ', 'Ŭ', 'ů', 'Ů', 'ű', 'Ű', 'ų', 'Ų', 'ŧ', 'Ŧ', 'į', 'Į', 'ĩ', 'Ĩ', 'ī', 'Ī', 'ĥ', 'Ĥ', 'ħ', 'Ħ', '฿', 'ะ', '༅', '༄', '།', '༎', '༕', '༖', '༓', '࿕', '࿖', '࿗', '࿘', 'CO', 'NO', 'Vig', 'XZ', 'XZZ', 'NZ', 'DH', 'CH', 'BH', 'AH',
+      'EH', 'FH', 'GHH', 'HHH', 'IH', 'JH', 'LH', 'MH', 'NH', 'OH', 'PH', 'QH', 'RH', 'SH', 'n', 'N', 'TH', 'UH', 'VH', 'WH', 'XH', 'YH', 'ZH', 'jJ', 'CBA', 'gA', 'eA', 'aN', 'lN', 'rN', 'oG', 'Wh', 'Wd', 'WD', 'Qx', 'QX', 'Hu', 'Gi', 'Qw', 'QW', 'ω',
+      'Ω', '{}', '()', '[]', 'Xg', '<span><span style="color: #D70909;">I</span><span style="color: orange;">I</span><span style="color: yellow;">I</span><span style="color: yellowgreen;">I</span><span style="color: cyan;">I</span><span style="color: purple;">I</span></span>', 
+      
+      '<img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン1.png" style="height: 14px; width: 14px;"></img>', 
+      '<img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン2.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン3.png" style="height: 14px; width: 14px;"></img>',
+      
+      '<img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン4.png" style="height: 14px; width: 14px;"></img>','<img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン5.png" style="height: 14px; width: 14px;"></img>',
+      
+      
+      '<img src="images/Screenshot_20250427_212014.jpg" style="height: 14px; width: 14px;"></img>', '<img src="images/c.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/d.png" style="height: 14px; width: 14px;"></img>', '<img src="images/e.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/f.png" style="height: 14px; width: 14px;"></img>', '<img src="images/g.png" style="height: 14px; width: 14px;"></img>', '<img src="images/h.png" style="height: 14px; width: 14px;"></img>', '<img src="images/i.png" style="height: 14px; width: 14px;"></img>', '<img src="images/j.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/k.png" style="height: 14px; width: 14px;"></img>', '<img src="images/jon.png" style="height: 14px; width: 14px;"></img>', '<img src="images/iPhone.png" style="height: 14px; width: 7px;"></img>', '<img src="images/m.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/hng.png" style="height: 14px; width: 14px;"></img>', '<img src="images/o.png" style="height: 14px; width: 14px;"></img>', '<img src="images/p.png" style="height: 14px; width: 14px;"></img>', '<img src="images/q.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/r.png" style="height: 14px; width: 14px;"></img>', '<img src="images/s.png" style="height: 14px; width: 14px;"></img>', '<img src="images/t.png" style="height: 14px; width: 14px;"></img>', '<img src="images/u.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/v.png" style="height: 14px; width: 14px;"></img>', '<img src="images/w.png" style="height: 14px; width: 14px;"></img>', '<img src="images/x.png" style="height: 14px; width: 14px;"></img>', '<img src="images/y.png" style="height: 14px; width: 14px;"></img>', '<img src="images/z.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aa.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/ab.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ac.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ad.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ae.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/af.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ag.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ah.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ai.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ak.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/al.png" style="height: 14px; width: 14px;"></img>', '<img src="images/am.png" style="height: 14px; width: 14px;"></img>', '<img src="images/an.png" style="height: 14px; width: 14px;"></img>', 'VK', 'Ob', 'Ot', 'St', 'Mt', 'Ht', '!X', '!!X', '<img src="images/ao.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ap.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/aq.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ar.png" style="height: 14px; width: 14px;"></img>', '<img src="images/as.png" style="height: 14px; width: 14px;"></img>', '<img src="images/at.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/au.png" style="height: 14px; width: 14px;"></img>', '<img src="images/av.png" style="height: 14px; width: 14px;"></img>', '<img src="images/aw.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ax.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/ay.png" style="height: 14px; width: 14px;"></img>', '<img src="images/az.png" style="height: 14px; width: 7px;"></img>', '<img src="images/ba.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bb.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bc.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bd.png" style="height: 14px; width: 14px;"></img>', '<img src="images/be.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bf.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bg.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bh.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bi.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bk.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bl.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bm.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bn.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bo.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bp.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bq.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/br.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bs.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bt.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bu.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bv.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bw.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/bx.png" style="height: 14px; width: 14px;"></img>', '<img src="images/by.png" style="height: 14px; width: 14px;"></img>', '<img src="images/bz.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ca.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/cb.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cc.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cd.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ce.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/cf.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cg.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ch.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ci.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/cj.png" style="height: 14px; width: 14px;"></img>', '<img src="images/ck.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cl.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cm.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/cn.png" style="height: 14px; width: 14px;"></img>', '<img src="images/co.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cp.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cq.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cr.png" style="height: 14px; width: 14px;"></img>', '<img src="images/cs.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/1.png" style="height: 14px; width: 14px;"></img>', '<img src="images/2.png" style="height: 14px; width: 14px;"></img>', '<img src="images/3.png" style="height: 14px; width: 14px;"></img>', '<img src="images/4.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/5.png" style="height: 14px; width: 14px;"></img>', '<img src="images/6.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/7.png" style="height: 14px; width: 14px;"></img>', '<img src="images/8.png" style="height: 14px; width: 14px;"></img>', '<img src="images/悪口.png" style="height: 14px; width: 14px;"></img>', '<img src="images/9.png" style="height: 14px; width: 14px;"></img>', '<img src="images/10.png" style="height: 14px; width: 14px;"></img>', '<img src="images/11.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/12.png" style="height: 14px; width: 14px;"></img>', '<img src="images/13.png" style="height: 14px; width: 14px;"></img>', '<img src="images/14.png" style="height: 14px; width: 14px;"></img>', '<img src="images/15.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/16.png" style="height: 14px; width: 14px;"></img>', '<img src="images/17.png" style="height: 17px; width: 14px;"></img>', '<img src="images/18.png" style="height: 18px; width: 14px;"></img>', '<img src="images/19.png" style="height: 19px; width: 14px;"></img>',
+      '<img src="images/20.png" style="height: 14px; width: 14px;"></img>',
+      '<img src="images/papasika.png" style="height: 14px; width: 14px;"></img>'];
+      for (let len = 2; len <= 3; len++) {
+        (function build(prefix, depth) {
+          if (depth === 0) u.push(prefix);
+          else for (const c of chars) build(prefix + c, depth - 1);
+        })('', len);
+      }
+      return u;
+    })();
+
+    function formatBigIntNumber(value) {
+      const thousand = 1000n;
+      if (value < thousand) return value.toString();
+      let unitIndex = 0;
+      let current = value;
+      while (current >= thousand && unitIndex < UNITS.length - 1) {
+        current /= thousand;
+        unitIndex++;
+      }
+      const divisor = thousand ** BigInt(unitIndex);
+      const whole = value / divisor;
+      const remainder = value % divisor;
+      const digits = whole.toString().length;
+      let result = '';
+      if (digits === 1) {
+        const decimal = ((remainder * 100n) / divisor).toString().padStart(2, '0');
+        result = `${whole}.${decimal}`;
+      } else if (digits === 2) {
+        const decimal = ((remainder * 10n) / divisor).toString();
+        result = `${whole}.${decimal}`;
+      } else {
+        result = `${whole}`;
+      }
+      return result + UNITS[unitIndex];
+    }
+
+    // HPの割合を毎回BigInt除算しない高速版。
+    // 敵生成時にmaxHpから閾値を作り、ゲーム中は比較だけにする。
+    function getColorFast(c) {
+      if (c.hp > c.hp80) return 'red';
+      if (c.hp > c.hp60) return 'orange';
+      if (c.hp > c.hp40) return 'yellow';
+      if (c.hp > c.hp20) return 'greenyellow';
+      return 'lightblue';
+    }
+
+    // 敵円の出現演出。各敵は完全に独立した状態を持つ。
+    // pending -> spawning -> active -> dead/expired の順で遷移し、
+    // ある敵を倒しても、まだ出現待ちの敵には一切影響しない。
+    const CIRCLE_COUNT = 11;
+    const CIRCLE_SPAWN_STAGGER = 120; // 順番に出現する間隔(ms)
+    const CIRCLE_SPAWN_DURATION = 240; // 拡大ズーム演出(ms)
+    // 敵は攻撃されない限り消滅しない。これは出現演出とは独立した仕様。
+    const CIRCLE_LIFETIME_AFTER_APPEAR = 0;
+
+    function circleIsAlive(c) {
+      return !!c && c.spawned && !c.dead && !c.expired && c.hp > 0n;
+    }
+
+    function circleIsFinished(c) {
+      return !!c && (c.dead || c.expired);
+    }
+
+    function killCircle(c, reason = 'hit') {
+      if (!c || c.dead || c.expired) return false;
+      c.hp = 0n;
+      if (reason === 'hit') c.dead = true;
+      else c.expired = true;
+      c.el.classList.add('circle-dead');
+      c.el.style.display = 'none';
+      c.el.style.opacity = '0';
+      c.el.style.transform = 'scale(.06)';
+      return true;
+    }
+
+    function createCircles() {
+      const game = document.getElementById('game');
+      Array.from(game.children).forEach(child => {
+        if (child.classList.contains('circle')) game.removeChild(child);
+      });
+
+      circles = [];
+
+      // HP計算はstageがBigIntなので、指数もBigIntとして扱い、Numberへ変換しない。
+      // 17/10 を stage-1 回掛けた値の整数部分をBigIntだけで正確に求める。
+      function getStageBaseHP() {
+        const n = stage > 1n ? stage - 1n : 0n;
+        let numerator = 1n;
+        let denominator = 1n;
+        let base = 17n;
+        let div = 10n;
+        let e = n;
+        while (e > 0n) {
+          if (e & 1n) {
+            numerator *= base;
+            denominator *= div;
+          }
+          e >>= 1n;
+          if (e > 0n) {
+            base *= base;
+            div *= div;
+          }
+        }
+        return 10n * (numerator / denominator);
+      }
+
+      const baseHP = getStageBaseHP();
+      const createdAt = performance.now();
+
+      for (let i = 0; i < CIRCLE_COUNT; i++) {
+        const hp = baseHP;
+        const div = document.createElement('div');
+        div.className = 'circle';
+        const x = Math.random() * Math.max(1, game.clientWidth - 74);
+        const y = Math.random() * Math.max(1, game.clientHeight - 74);
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+        div.style.display = 'none';
+        div.style.opacity = '0';
+        div.style.transform = 'scale(.06)';
+        game.appendChild(div);
+
+        const circle = {
+          el: div,
+          hp,
+          maxHp: hp,
+          x,
+          y,
+          hp80: hp * 80n / 100n,
+          hp60: hp * 60n / 100n,
+          hp40: hp * 40n / 100n,
+          hp20: hp * 20n / 100n,
+          renderedHp: null,
+          renderedColor: '',
+          index: i,
+          spawnAt: createdAt + i * CIRCLE_SPAWN_STAGGER,
+          spawnEnd: createdAt + i * CIRCLE_SPAWN_STAGGER + CIRCLE_SPAWN_DURATION,
+          // expireAt は互換性のため保持するが、時間経過による自動撃破には使用しない。
+          expireAt: Infinity,
+          spawned: false,
+          animationDone: false,
+          dead: false,
+          expired: false
+        };
+
+        div.onclick = () => {
+          // 出現演出中でも、その敵自身は攻撃対象。ただし順番待ちの敵には触れない。
+          if (!circleIsAlive(circle) || stageChanging) return;
+          const dmg = tapAttack < circle.hp ? tapAttack : circle.hp;
+          circle.hp -= dmg;
+          collection += dmg;
+          if (circle.hp <= 0n) killCircle(circle, 'hit');
+          renderCircles(true);
+          updateUI();
+          checkStageClear();
+        };
+
+        circles.push(circle);
+      }
+
+      renderCircles(true);
+    }
+
+    let lastCircleRender = 0;
+    const CIRCLE_RENDER_INTERVAL = 33; // 巨大BigIntの文字列化・DOM更新だけ約30fpsに制限。
+
+    function renderCircleSpawnAnimation(now) {
+      for (const c of circles) {
+        if (c.dead || c.expired) continue;
+
+        if (!c.spawned) {
+          if (now < c.spawnAt) {
+            c.el.style.display = 'none';
+            continue;
+          }
+          c.spawned = true;
+          c.el.classList.remove('circle-dead');
+          c.el.style.display = 'flex';
+        }
+
+        if (!c.animationDone) {
+          const raw = Math.min(1, Math.max(0, (now - c.spawnAt) / CIRCLE_SPAWN_DURATION));
+          // 動画風の「小さく出現→一気に拡大→わずかに弾む」ズーム。
+          const eased = 1 - Math.pow(1 - raw, 3);
+          const overshoot = raw < 1 ? 0.06 * Math.sin(raw * Math.PI) : 0;
+          const scale = Math.max(.06, eased * 1.04 - overshoot);
+          c.el.style.opacity = String(Math.min(1, raw * 1.5));
+          c.el.style.transform = `scale(${scale})`;
+
+          if (raw >= 1) {
+            c.animationDone = true;
+            c.el.style.opacity = '1';
+            c.el.style.transform = 'scale(1)';
+          }
+        }
+
+        // 完全出現後も、敵は攻撃されるまで残り続ける。
+        // 時間経過だけでは hp を 0 にしたり expired にしたりしない。
+        // ボール・Prestige・タップが killCircle(c, 'hit') を呼んだ場合だけ消える。
+      }
+    }
+
+    function renderCircles(force = false, now = performance.now()) {
+      if (!force && now - lastCircleRender < CIRCLE_RENDER_INTERVAL) return;
+      lastCircleRender = now;
+
+      circles.forEach(c => {
+        if (c.dead || c.expired || c.hp <= 0n) {
+          if (c.el.style.display !== 'none') c.el.style.display = 'none';
+          return;
+        }
+
+        // まだ出現待ちなら、DOM上でも完全に非表示にする。
+        if (!c.spawned) {
+          c.el.style.display = 'none';
+          return;
+        }
+
+        if (c.el.style.display !== 'flex') c.el.style.display = 'flex';
+
+        if (c.renderedHp !== c.hp) {
+          c.el.innerHTML = formatBigIntNumber(c.hp);
+          c.renderedHp = c.hp;
+        }
+
+        const color = getColorFast(c);
+        if (c.renderedColor !== color) {
+          c.el.style.background = color;
+          c.renderedColor = color;
+        }
+      });
+    }
+
+    function checkStageClear() {
+      if (stageChanging || !circles.length) return;
+      // 「まだ出ていない敵」はここでは倒れた扱いにしない。
+      // 全員が出現し、実際に撃破されたら次ステージへ進む。
+      if (circles.every(circleIsFinished)) {
+        stageChanging = true;
+        stage += 1n;
+        requestAnimationFrame(() => {
+          createCircles();
+          stageChanging = false;
+          renderBallUpgrades();
+          renderBallInfo();
+          updateUI();
+          saveGame();
+        });
+      }
+    }
+
+    const ballTypes = [
+      { color: 'red', attack: 1n, cost: 0n },
+      { color: 'blue', attack: 30n, cost: 0n },
+      { color: 'yellow', attack: 90n, cost: 0n },
+      { color: 'green', attack: 270n, cost: 6000n },
+      { color: 'orange', attack: 810n, cost: 17500n },
+      { color: 'yellowgreen', attack: 2000n, cost: 35000n },
+      { color: 'gray', attack: 10000n, cost: 80000n },
+      { color: 'lightblue', attack: 50000n, cost: 160000n },
+      { color: 'purple', attack: 100000n, cost: 1020000n },
+      { color: 'pink', attack: 530000n, cost: 11830000n },
+      { color: 'black', attack: 995000n, cost: 73000000n },
+      { color: 'brown', attack: 1900000n, cost: 700000000n },
+{ color: 'greenyellow', attack: 8000000n, cost: 8100000000n },
+{ color: '#F8C3B6', attack: 11000000n, cost: 10000000000n },
+{ color: 'chocolate', attack: 1000000000n, cost: 100000000000n },
+{ color: 'springgreen', attack: 50000000000n, cost: 500000000000n },
+{ color: 'royalblue', attack: 100000000000n, cost: 1000000000000n },
+{ color: '#B00000', attack: 345100000000n, cost: 9900000000000n },
+{ color: 'gold', attack: 1850000000000n, cost: 10000000000000n },
+{ color: 'darkpurple', attack: 6050000000000n, cost: 50000000000000n },
+{ color: '#212728', attack: 18500000000000n, cost: 100000000000000n },
+{ color: 'magenta', attack: 78500000000000n, cost: 1000000000000000n },
+{ color: 'darkred', attack: 585000000000000n, cost: 19800000000000000n },
+{ color: 'yellowgreen', attack: 4850000000000000n, cost: 38500000000000000n },
+{ color: '#666666', attack: 38850000000000000n, cost: 200000000000000000n },
+{ color: '#123456', attack: 388500000000000000n, cost: 2000000000000000000n },
+{ color: '#ABCDEF', attack: 3885000000000000000n, cost: 15300000000000000000n },
+{ color: '#A00000', attack: 38850000000000000000n, cost: 553000000000000000000n },
+{ color: '#EEEEEE', attack: 388500000000000000000n, cost: 1530000000000000000000n },
+{ color: '#700129', attack: 3885000000000000000000n, cost: 15300000000000000000000n },
+{ color: '#111111', attack: 38850000000000000000000n, cost: 153000000000000000000000n },
+{ color: '#129999', attack: 388500000000000000000000n, cost: 1530000000000000000000000n },
+{ color: '#D84674', attack: 3885000000000000000000000n, cost: 15300000000000000000000000n },
+{ color: '#1B9570', attack: 39850000000000000000000000n, cost: 193000000000000000000000000n },
+{ color: '#319482', attack: 398500000000000000000000000n, cost: 1930000000000000000000000000n },
+{ color: '#391040', attack: 4985000000000000000000000000n, cost: 20300000000000000000000000000n },
+{ color: 'olive', attack: 49850000000000000000000000000n, cost: 203000000000000000000000000000n },
+{ color: 'indigo', attack: 498500000000000000000000000000n, cost: 9000300000000000000000000000000n },
+{ color: 'aqua', attack: 4000985000000000000000000000000n, cost: 90300000000000000000000000000000n },
+{ color: 'coral', attack: 49850000000000000000000000000000n, cost: 953000000000000000000000000000000n },
+{ color: 'maroon', attack: 498500000000000000000000000000000n, cost: 10300000000000000000000000000000000n },
+{ color: 'darkmagenta', attack: 49850000000000000000000000000000000n, cost: 203000000000000000000000000000000000n },
+{ color: 'darkgray', attack: 498500000000000000000000000000000000n, cost: 2030000000000000000000000000000000000n },
+{ color: 'azure', attack: 4985000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000n },
+{ color: 'beige', attack: 49850000000000000000000000000000000000n, cost: 203000000000000000000000000000000000000n },
+{ color: 'cornsilk', attack: 498500000000000000000000000000000000000n, cost: 2030000000000000000000000000000000000000n },
+{ color: '#FAC8C1', attack: 4985000000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000000n },
+{ color: '#6B7121', attack: 49850000000000000000000000000000000000000n, cost: 203000000000000000000000000000000000000000n },
+{ color: 'lightgreen', attack: 498500000000000000000000000000000000000000n, cost: 2030000000000000000000000000000000000000000n },
+{ color: 'darkgreen', attack: 4985000000000000000000000000000000000000000n, cost: 20300000000000000000000000000000000000000000n }
+];
+// 動画のように、後半のボールほど移動速度を少しずつ上げる。
+ballTypes.forEach((type, i) => {
+  type.speed = Math.min(3.8 + i * 0.12, 8.2);
+});
+
+    // Prestigeボールは一度購入すると永久所持。
+    // 各ボールは範囲攻撃を行い、中心から遠い敵ほどダメージが下がる。
+    const prestigeTypes = [
+      { name: 'Nova', color: '#00d9ff', attack: 1000000n, cost: 1000000000000n, radius: 695, speed: 12 },
+      { name: 'Eclipse', color: '#6a4cff', attack: 50000000n, cost: 100000000000000n, radius: 615, speed: 12 },
+      { name: 'Solar', color: '#ffb300', attack: 3000000000n, cost: 10000000000000000n, radius: 735, speed: 12 },
+      { name: 'Void', color: '#17101f', attack: 200000000000n, cost: 1000000000000000000n, radius: 760, speed: 12 },
+      { name: 'Prism', color: 'linear-gradient(135deg,#ff3b3b,#ffd43b,#42e36b,#35a7ff,#b84cff)', attack: 15000000000000n, cost: 100000000000000000000n, radius: 800, speed: 12 },
+      { name: 'poop', color: 'greenyellow', attack: 100000000000000000000000000000000000000000000000000000000000n, cost: 1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, radius: 1200, speed: 12 },
+      { name: 'dffg', color: '#833984', attack: 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, cost: 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, radius: 1300, speed: 12.2 },
+      { name: 'ONOVA', color: 'darkred', attack: 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, cost: 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, radius: 1695, speed: 12.2 },
+      { name: 'KNOVA', color: 'skyblue', attack: 1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, cost: 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, radius: 1695, speed: 12.2 },
+      
+      { name: 'Singularity', color: '#9b00ff', attack: 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, cost: 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000n, radius: 1100, speed: 12.6 },
+      { name: 'Z&X', color: 'black', attack: 25n ** 2000n, cost: 30n ** 2100n, radius: 1695, speed: 12.2 },
+      { name: 'FBCBakaking', color: 'gold', attack: 80n ** 3000n, cost: 80n ** 3050n, radius: 1695, speed: 13.2 }
+
+    ];
+
+    let prestigeBalls = prestigeTypes.map(type => ({
+      el: null, x: 0, y: 0, vx: 0, vy: 0,
+      attack: type.attack, cost: type.cost, purchased: false, lastHitTime: 0
+    }));
+
+    // Prestige時に通常ボールだけを初期状態へ戻す。
+    function resetNormalBallsForPrestige() {
+      balls.forEach(b => { if (b.el) b.el.remove(); });
+      balls = ballTypes.map(type => ({
+        el: null, x: 0, y: 0, vx: 0, vy: 2,
+        attack: type.attack, cost: type.cost,
+        purchased: false, lastHitTime: 0
+      }));
+    }
+
+    function createPrestigeBall(type, index) {
+      const game = document.getElementById('game');
+      const div = document.createElement('div');
+      div.className = 'ball prestige-ball';
+      div.style.background = type.color;
+      div.style.boxShadow = '0 0 12px rgba(123,44,255,.75)';
+      div.style.border = '2px solid rgba(255,255,255,.7)';
+      game.appendChild(div);
+
+      const b = prestigeBalls[index];
+      b.el = div;
+      b.x = Math.random() * Math.max(0, game.clientWidth - 20);
+      b.y = Math.random() * Math.max(0, game.clientHeight - 20);
+      const angle = Math.random() * Math.PI * 2;
+      b.vx = Math.cos(angle) * type.speed;
+      b.vy = Math.sin(angle) * type.speed;
+      b.lastHitTime = performance.now();
+    }
+
+    function purchasePrestige(index) {
+      const type = prestigeTypes[index];
+      const b = prestigeBalls[index];
+      if (b.purchased || points < type.cost || stageChanging) return;
+
+      const ok = confirm(
+        `${type.name} Prestige Ballを購入しますか？\n` +
+        `価格: ${formatBigIntNumber(type.cost)}\n\n` +
+        `購入するとステージは1に戻り、通常ボールはすべて未購入に戻ります。\n` +
+        `すでに購入したPrestigeボールは残ります。`
+      );
+      if (!ok) return;
+
+      // 購入を確定してからリセットすることで、ゲームループとの競合を防ぐ。
+      points -= type.cost;
+      b.purchased = true;
+      stageChanging = true;
+
+      resetNormalBallsForPrestige();
+      stage = 1n;
+      createCircles();
+
+      // 既存のPrestigeボールは所有状態を維持し、DOMだけ作り直す。
+      prestigeBalls.forEach((pb, i) => {
+        if (pb.el) pb.el.remove();
+        pb.el = null;
+        if (pb.purchased) createPrestigeBall(prestigeTypes[i], i);
+      });
+
+      stageChanging = false;
+      renderBallUpgrades();
+      renderBallInfo();
+      updateUI();
+      saveGame();
+    }
+
+    // Prestigeボールの強化。通常ボールと同じく、1回ごとに攻撃力・コストを1.15倍。
+    // BigIntなので小数は切り捨てるが、最低でも1増えるようにする。
+    function upgradePrestige(index) {
+      const b = prestigeBalls[index];
+      if (!b.purchased || stageChanging || points < b.cost) return;
+      points -= b.cost;
+      const oldAttack = b.attack;
+      const oldCost = b.cost;
+      b.attack = (oldAttack * 115n + 99n) / 100n;
+      b.cost = (oldCost * 115n + 99n) / 100n;
+      if (b.attack <= oldAttack) b.attack = oldAttack + 1n;
+      if (b.cost <= oldCost) b.cost = oldCost + 1n;
+      updateUI();
+      renderBallUpgrades();
+      saveGame();
+    }
+
+    function renderPrestigeUpgrades() {
+      const container = document.getElementById('prestigeUpgrades');
+      if (!container) return;
+      container.innerHTML = '';
+
+      prestigeTypes.forEach((type, index) => {
+        const b = prestigeBalls[index];
+        const card = document.createElement('div');
+        card.className = 'card prestige-card';
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = type.name;
+        card.appendChild(title);
+        card.appendChild(makeCardIcon(type.color, '', type.icon));
+
+        const stat = document.createElement('div');
+        stat.className = 'card-stat';
+        stat.innerHTML = formatBigIntNumber(b.purchased ? b.attack : type.attack);
+        card.appendChild(stat);
+
+        const btn = document.createElement('button');
+        btn.className = 'card-action';
+        if (b.purchased) {
+          btn.innerHTML = `⬆ ${formatBigIntNumber(b.cost)}`;
+          btn.classList.add('affordable');
+          bindLongPress(btn, () => upgradePrestige(index));
+        } else {
+          btn.innerHTML = `<span class="lock">🔒</span>${formatBigIntNumber(type.cost)}`;
+          btn.classList.add('locked');
+          if (points >= type.cost) btn.classList.add('affordable');
+          bindLongPress(btn, () => purchasePrestige(index));
+        }
+        card.appendChild(btn);
+        container.appendChild(card);
+      });
+    }
+
+    // ボールは「購入したものだけ」DOMを作成する。
+    // 全種類を最初から生成していたため、購入前でも大量のDOMが存在していました。
+    function createBall(type, index) {
+      const game = document.getElementById('game');
+      const div = document.createElement('div');
+      div.className = 'ball';
+      div.style.backgroundColor = type.color;
+      game.appendChild(div);
+
+      balls[index].el = div;
+      balls[index].x = Math.random() * Math.max(0, game.clientWidth - 27);
+      balls[index].y = Math.random() * Math.max(0, game.clientHeight - 27);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = type.speed || 4;
+      balls[index].vx = Math.cos(angle) * speed;
+      balls[index].vy = Math.sin(angle) * speed;
+      balls[index].lastHitTime = performance.now();
+    }
+
+    // 各ボールの購入状態だけを保持し、未購入ボールのDOMは作らない。
+    balls = ballTypes.map(type => ({
+      el: null,
+      x: 0, y: 0, vx: 0, vy: 2,
+      attack: type.attack,
+      cost: type.cost,
+      purchased: false,
+      lastHitTime: 0
+    }));
+
+    function makeCardIcon(color, label, imageSrc) {
+      const icon = document.createElement('div');
+      icon.className = 'card-icon';
+      if (imageSrc) {
+        const img = document.createElement('img');
+        img.src = imageSrc;
+        img.alt = '';
+        img.style.maxWidth = '70px';
+        img.style.maxHeight = '70px';
+        img.style.objectFit = 'contain';
+        img.onerror = () => { img.remove(); };
+        icon.appendChild(img);
+      } else if (label) {
+        icon.textContent = label;
+        icon.style.fontSize = '46px';
+      } else {
+        const mini = document.createElement('div');
+        mini.className = 'mini-ball';
+        mini.style.background = color;
+        mini.style.color = color;
+        icon.appendChild(mini);
+      }
+      return icon;
+    }
+
+    // ===== 長押し高速アップグレード =====
+    // 短押しは1回、約350ms以上押し続けると高速で連続購入。
+    function bindLongPress(button, action) {
+      let timer = null;
+      let repeat = null;
+      let pressing = false;
+      let fired = false;
+
+      const stop = () => {
+        pressing = false;
+        if (timer !== null) { clearTimeout(timer); timer = null; }
+        if (repeat !== null) { clearInterval(repeat); repeat = null; }
+      };
+
+      const start = (e) => {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        if (e.type === 'touchstart') e.preventDefault();
+        stop();
+        pressing = true;
+        fired = false;
+        timer = setTimeout(() => {
+          if (!pressing) return;
+          fired = true;
+          action();
+          repeat = setInterval(() => {
+            if (!pressing) return;
+            action();
+          }, 45);
+        }, 350);
+      };
+
+      const end = () => {
+        if (pressing && !fired) action();
+        stop();
+      };
+
+      button.addEventListener('mousedown', start);
+      button.addEventListener('mouseup', end);
+      button.addEventListener('mouseleave', stop);
+      button.addEventListener('touchstart', start, {passive:false});
+      button.addEventListener('touchend', end);
+      button.addEventListener('touchcancel', stop);
+      button.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    function renderBallUpgrades() {
+      const container = document.getElementById('ballUpgrades');
+      if (!container) return;
+      container.innerHTML = '';
+
+      // 動画にある「タップ」カードも先頭に配置。
+      const tapCard = document.createElement('div');
+      tapCard.className = 'card';
+      const tapTitle = document.createElement('div');
+      tapTitle.className = 'card-title';
+      tapTitle.textContent = 'タップ';
+      tapCard.appendChild(tapTitle);
+      tapCard.appendChild(makeCardIcon('#777', '👆'));
+      const tapStat = document.createElement('div');
+      tapStat.className = 'card-stat';
+      tapStat.innerHTML = formatBigIntNumber(tapAttack);
+      tapCard.appendChild(tapStat);
+      const tapBtn = document.createElement('button');
+      tapBtn.className = 'card-action affordable';
+      tapBtn.innerHTML = `⬆ ${formatBigIntNumber(tapCost)}`;
+      bindLongPress(tapBtn, () => tupg());
+      tapCard.appendChild(tapBtn);
+      container.appendChild(tapCard);
+
+      ballTypes.forEach((ballType, index) => {
+        const b = balls[index];
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = ballType.name || `${ballType.color} Ball`;
+        card.appendChild(title);
+
+        card.appendChild(makeCardIcon(ballType.color, '', ballType.icon));
+
+        const stat = document.createElement('div');
+        stat.className = 'card-stat';
+        stat.innerHTML = formatBigIntNumber(b.purchased ? b.attack : ballType.attack);
+        card.appendChild(stat);
+
+        const btn = document.createElement('button');
+        btn.className = 'card-action';
+
+        if (!b.purchased) {
+          btn.innerHTML = `<span class="lock">🔒</span>${formatBigIntNumber(ballType.cost)}`;
+          btn.classList.add('locked');
+          if (points >= ballType.cost) btn.classList.add('affordable');
+          bindLongPress(btn, () => {
+            if (points >= ballType.cost && !b.purchased) {
+              points -= ballType.cost;
+              b.purchased = true;
+              createBall(ballType, index);
+              updateUI();
+              renderBallUpgrades();
+              saveGame();
+            }
+          });
+        } else {
+          btn.innerHTML = `⬆ ${formatBigIntNumber(b.cost)}`;
+          btn.classList.add('affordable');
+          bindLongPress(btn, () => {
+            if (points >= b.cost) {
+              points -= b.cost;
+              b.attack = (b.attack * ATTACK_NUM + ATTACK_DEN - 1n) / ATTACK_DEN;
+              b.cost = b.cost * COST_NUM / COST_DEN;
+              if (b.cost < 1n) b.cost = 1n;
+              updateUI();
+              renderBallUpgrades();
+              saveGame();
+            }
+          });
+        }
+
+        card.appendChild(btn);
+        container.appendChild(card);
+      });
+
+      renderBallInfo();
+      renderPrestigeUpgrades();
+    }
+
+function tupg() {
+  // タップ強化は、ステータス変更と同じ処理内でカードを即時再描画する。
+  if (points < tapCost) return;
+
+  points -= tapCost;
+  tapAttack = (tapAttack * 108n) / 100n + 1n;
+  tapCost = (tapCost * 17n) / 10n;
+  if (tapCost < 1n) tapCost = 1n;
+
+  // ここが重要：タップカードの攻撃力・次の強化価格を即時反映。
+  renderBallUpgrades();
+  renderBallInfo();
+  updateUI();
+  saveGame();
+}
+
+function mou() {
+
+let moo = document.getElementById('mo');
+
+moo.innerHTML = "<button onclick='tupd()'>MOD</button>";
+
+}
+
+function tupdsd() {
+
+const stageInput = prompt("ステージ番号を入力してください（1以上の整数）");
+let numg;
+try {
+  numg = BigInt((stageInput ?? "").trim());
+} catch (e) {
+  alert("ステージは1以上の整数で入力してください。");
+  return;
+}
+if (numg < 1n) {
+  alert("ステージは1以上で入力してください。");
+  return;
+}
+
+stage = numg;
+      createCircles();
+
+tapAttack = tapAttack + 10n ** stage;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+function tupd() {
+
+tapAttack = tapAttack * 1000n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+function tupdst() {
+
+tapAttack = 1n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+function tupdp() {
+
+points = points * 0n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+function tupdpp() {
+
+points = points * 1000n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+    function renderBallInfo() {
+      const info = document.getElementById('ballInfo');
+      info.innerHTML = `<div>タップ攻撃力: ${formatBigIntNumber(tapAttack)}, 次の強化: ${formatBigIntNumber(tapCost)}</div>`;
+      balls.forEach((b, i) => {
+        if (b.purchased) {
+          const div = document.createElement('div');
+          div.innerHTML = `${ballTypes[i].color} Ball: 攻撃力=${formatBigIntNumber(b.attack)}, 次の強化=${formatBigIntNumber(b.cost)}`;
+          info.appendChild(div);
+        }
+      });
+
+      prestigeBalls.forEach((b, i) => {
+        if (b.purchased) {
+          const div = document.createElement('div');
+          div.innerHTML = `✦ ${prestigeTypes[i].name}: 攻撃力=${formatBigIntNumber(b.attack)}, 次の強化=${formatBigIntNumber(b.cost)}, 範囲=${prestigeTypes[i].radius}px（直撃100%、周囲は距離に応じ80%〜10%）`;
+          info.appendChild(div);
+        }
+      });
+    }
+
+    function updateUI() {
+      const pointsEl = document.getElementById('points');
+      if (pointsEl) pointsEl.innerHTML = formatBigIntNumber(points);
+      const pointsHudEl = document.getElementById('pointsHud');
+      if (pointsHudEl) pointsHudEl.innerHTML = formatBigIntNumber(points);
+
+      const stageEl = document.getElementById('stn');
+      if (stageEl) stageEl.innerHTML = formatBigIntNumber(stage);
+
+      const collectionEl = document.getElementById('collection');
+      if (collectionEl) collectionEl.innerHTML = formatBigIntNumber(collection);
+
+      const collectButton = document.getElementById('collectButton');
+      if (collectButton) collectButton.classList.toggle('empty', collection === 0n);
+
+      // 現ステージの残HPから、動画風の進行バーを作る。
+      let ratio = 0;
+      if (circles.length) {
+        let maxTotal = 0n, hpTotal = 0n;
+        for (const c of circles) {
+          maxTotal += c.maxHp;
+          if (c.hp > 0n) hpTotal += c.hp;
+        }
+        if (maxTotal > 0n) {
+          // 巨大BigIntでも0〜100だけNumber化する。
+          const scaled = hpTotal * 10000n / maxTotal;
+          ratio = Number(scaled) / 100;
+        }
+      }
+      const fill = document.getElementById('levelProgressFill');
+      if (fill) fill.style.width = `${Math.max(0, Math.min(100, 100 - ratio))}%`;
+    }
+
+    function collectToPoints() {
+      if (collection <= 0n) return;
+      points += collection;
+      collection = 0n;
+      updateUI();
+      renderBallUpgrades();
+      saveGame();
+    }
+
+    // ===== 高負荷対策 =====
+    // 物理計算は通常どおり行いつつ、重いBigIntの文字列化・DOM更新だけを
+    // 30fps程度に制限する。これによりHPが巨大でも画面描画で固まりにくくする。
+    const gameEl = document.getElementById('game');
+    const MAX_DT = 32;
+    let lastFrameTime = performance.now();
+    let lastUiUpdate = 0;
+    let stageChanging = false;
+    let framePendingCollection = 0n;
+
+    function gameLoop(now) {
+      const dt = Math.min(MAX_DT, Math.max(0, now - lastFrameTime));
+      lastFrameTime = now;
+
+      const w = gameEl.clientWidth;
+      const h = gameEl.clientHeight;
+      let changed = false;
+
+      if (stageChanging) {
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      // 出現アニメーションは毎フレーム更新。敵ごとに独立しているため、
+      // 1体が倒れても待機中・演出中の他の敵のタイミングは変わらない。
+      renderCircleSpawnAnimation(now);
+      renderCircles(false, now);
+
+      // そのフレームのポイント加算をまとめ、BigInt加算回数を減らす。
+      framePendingCollection = 0n;
+
+      // 通常ボール
+      for (const b of balls) {
+        if (!b.purchased || !b.el || stageChanging) continue;
+
+        const scale = dt / 16.67;
+        b.x += b.vx * scale;
+        b.y += b.vy * scale;
+
+        if (b.x <= 0) { b.x = 0; b.vx = Math.abs(b.vx); }
+        else if (b.x >= w - 20) { b.x = Math.max(0, w - 20); b.vx = -Math.abs(b.vx); }
+        if (b.y <= 0) { b.y = 0; b.vy = Math.abs(b.vy); }
+        else if (b.y >= h - 20) { b.y = Math.max(0, h - 20); b.vy = -Math.abs(b.vy); }
+
+        b.el.style.transform = `translate3d(${b.x}px,${b.y}px,0)`;
+
+        let hit = false;
+        for (const c of circles) {
+          if (!circleIsAlive(c)) continue;
+
+          const dx = (c.x + 30) - (b.x + 10);
+          const dy = (c.y + 30) - (b.y + 10);
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq < 1600) {
+            const dmg = b.attack < c.hp ? b.attack : c.hp;
+            c.hp -= dmg;
+            if (c.hp <= 0n) killCircle(c, 'hit');
+            framePendingCollection += dmg;
+            b.lastHitTime = now;
+            changed = true;
+            hit = true;
+
+            const dist = Math.sqrt(distSq) || 1;
+            const normalX = dx / dist;
+            const normalY = dy / dist;
+            const dot = b.vx * normalX + b.vy * normalY;
+            b.vx -= 2 * dot * normalX;
+            b.vy -= 2 * dot * normalY;
+            break;
+          }
+        }
+
+        if (!hit && now - b.lastHitTime > 6000) {
+          const target = circles.find(circleIsAlive);
+          if (target) {
+            const dx = (target.x + 30) - (b.x + 10);
+            const dy = (target.y + 30) - (b.y + 10);
+            const dist = Math.hypot(dx, dy) || 1;
+            b.vx = (dx / dist) * 2.5;
+            b.vy = (dy / dist) * 2.5;
+          }
+        }
+      }
+
+      // Prestigeボール
+      for (let i = 0; i < prestigeBalls.length; i++) {
+        const b = prestigeBalls[i];
+        const type = prestigeTypes[i];
+        if (!b.purchased || !b.el || stageChanging) continue;
+
+        const scale = dt / 16.67;
+        b.x += b.vx * scale;
+        b.y += b.vy * scale;
+
+        if (b.x <= 0) { b.x = 0; b.vx = Math.abs(b.vx); }
+        else if (b.x >= w - 20) { b.x = Math.max(0, w - 20); b.vx = -Math.abs(b.vx); }
+        if (b.y <= 0) { b.y = 0; b.vy = Math.abs(b.vy); }
+        else if (b.y >= h - 20) { b.y = Math.max(0, h - 20); b.vy = -Math.abs(b.vy); }
+
+        b.el.style.transform = `translate3d(${b.x}px,${b.y}px,0)`;
+
+        let directTarget = null;
+        let directDistSq = Infinity;
+
+        // sqrtを使わず距離の二乗で直撃判定。
+        for (const c of circles) {
+          if (!circleIsAlive(c)) continue;
+          const dx = (c.x + 30) - (b.x + 10);
+          const dy = (c.y + 30) - (b.y + 10);
+          const distSq = dx * dx + dy * dy;
+          if (distSq <= 1600 && distSq < directDistSq) {
+            directTarget = c;
+            directDistSq = distSq;
+          }
+        }
+
+        if (directTarget) {
+          const directDamage = b.attack < directTarget.hp ? b.attack : directTarget.hp;
+          directTarget.hp -= directDamage;
+          if (directTarget.hp <= 0n) killCircle(directTarget, 'hit');
+          framePendingCollection += directDamage;
+          b.lastHitTime = now;
+          changed = true;
+
+          const dx = (directTarget.x + 30) - (b.x + 10);
+          const dy = (directTarget.y + 30) - (b.y + 10);
+          const dist = Math.hypot(dx, dy) || 1;
+          const normalX = dx / dist;
+          const normalY = dy / dist;
+          const dot = b.vx * normalX + b.vy * normalY;
+          b.vx -= 2 * dot * normalX;
+          b.vy -= 2 * dot * normalY;
+
+          // 範囲攻撃。平方根を使わず、必要な対象だけsqrtする。
+          const radiusSq = type.radius * type.radius;
+          for (const c of circles) {
+            if (c === directTarget || !circleIsAlive(c)) continue;
+
+            const dx2 = (c.x + 30) - (directTarget.x + 30);
+            const dy2 = (c.y + 30) - (directTarget.y + 30);
+            const distSq2 = dx2 * dx2 + dy2 * dy2;
+            if (distSq2 > radiusSq) continue;
+
+            const dist2 = Math.sqrt(distSq2);
+            const ratio = Math.max(10, Math.min(80,
+              Math.floor(80 - (70 * dist2 / type.radius))
+            ));
+
+            let splashDamage = (b.attack * BigInt(ratio)) / 100n;
+            if (splashDamage < 1n) splashDamage = 1n;
+            if (splashDamage > c.hp) splashDamage = c.hp;
+            c.hp -= splashDamage;
+            if (c.hp <= 0n) killCircle(c, 'hit');
+            framePendingCollection += splashDamage;
+            changed = true;
+          }
+
+          if (circles.length && circles.every(c => c.hp <= 0n)) break;
+        }
+
+        if (!directTarget && now - b.lastHitTime > 6000) {
+          const target = circles.find(circleIsAlive);
+          if (target) {
+            const dx = (target.x + 30) - (b.x + 10);
+            const dy = (target.y + 30) - (b.y + 10);
+            const dist = Math.hypot(dx, dy) || 1;
+            b.vx = (dx / dist) * type.speed;
+            b.vy = (dy / dist) * type.speed;
+          }
+        }
+      }
+
+      if (framePendingCollection !== 0n) {
+        collection += framePendingCollection;
+        changed = true;
+      }
+
+      if (changed) {
+        // BigIntの巨大なHPを毎フレーム文字列化しない。
+        renderCircles(false, now);
+
+        // UIは10fps程度までに制限。
+        if (now - lastUiUpdate > 100) {
+          updateUI();
+          lastUiUpdate = now;
+        }
+      }
+
+      checkStageClear();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function serializeBigInt(value) {
+      return value.toString();
+    }
+
+    function saveGame() {
+      try {
+        const data = {
+          points: serializeBigInt(points),
+          collection: serializeBigInt(collection),
+          stage: stage.toString(),
+          tapAttack: serializeBigInt(tapAttack),
+          tapCost: serializeBigInt(tapCost),
+          balls: balls.map(b => ({
+            attack: serializeBigInt(b.attack),
+            cost: serializeBigInt(b.cost),
+            purchased: b.purchased
+          })),
+          prestigeBalls: prestigeBalls.map(b => ({
+            attack: serializeBigInt(b.attack),
+            cost: serializeBigInt(b.cost),
+            purchased: b.purchased
+          })),
+          savedAt: Date.now()
+        };
+        localStorage.setItem('idleBallsSave', JSON.stringify(data));
+        const status = document.getElementById('saveStatus');
+        if (status) status.textContent = '保存しました';
+      } catch (e) {
+        console.warn('セーブ失敗:', e);
+      }
+    }
+
+    function loadGame() {
+      try {
+        const raw = localStorage.getItem('idleBallsSave');
+        if (!raw) {
+          const status = document.getElementById('saveStatus');
+          if (status) status.textContent = 'セーブデータなし';
+          return;
+        }
+
+        const data = JSON.parse(raw);
+        points = BigInt(data.points);
+        collection = data.collection ? BigInt(data.collection) : 0n;
+        try {
+          stage = BigInt(data.stage);
+          if (stage < 1n) stage = 1n;
+        } catch (e) {
+          stage = 1n;
+        }
+        tapAttack = BigInt(data.tapAttack);
+        tapCost = BigInt(data.tapCost);
+
+        // 既存ボールDOMを全削除してから復元。
+        document.querySelectorAll('#game .ball').forEach(el => el.remove());
+
+        balls = ballTypes.map((type, i) => {
+          const saved = data.balls && data.balls[i];
+          return {
+            el: null, x: 0, y: 0, vx: 0, vy: 2,
+            attack: saved ? BigInt(saved.attack) : type.attack,
+            cost: saved ? BigInt(saved.cost) : type.cost,
+            purchased: !!(saved && saved.purchased),
+            lastHitTime: performance.now()
+          };
+        });
+
+        prestigeBalls = prestigeTypes.map((type, i) => {
+          const saved = data.prestigeBalls && data.prestigeBalls[i];
+          return {
+            el: null, x: 0, y: 0, vx: 0, vy: 0,
+            attack: saved ? BigInt(saved.attack) : type.attack,
+            cost: saved && saved.cost ? BigInt(saved.cost) : type.cost,
+            purchased: !!(saved && saved.purchased),
+            lastHitTime: performance.now()
+          };
+        });
+
+        createCircles();
+        balls.forEach((b, i) => {
+          if (b.purchased) createBall(ballTypes[i], i);
+        });
+        prestigeBalls.forEach((b, i) => {
+          if (b.purchased) createPrestigeBall(prestigeTypes[i], i);
+        });
+        renderBallUpgrades();
+        renderBallInfo();
+        updateUI();
+
+        const status = document.getElementById('saveStatus');
+        if (status) status.textContent = 'ロードしました';
+      } catch (e) {
+        console.error('ロード失敗:', e);
+        const status = document.getElementById('saveStatus');
+        if (status) status.textContent = 'ロードに失敗しました';
+      }
+    }
+
+    // リセット中は自動セーブ・終了時セーブを止める。
+    // これをしないと location.reload() → beforeunload → saveGame() の順で
+    // 削除したセーブデータが再保存されてしまう。
+    let resetInProgress = false;
+
+    function resetGame() {
+      if (!confirm('セーブデータも含めてリセットしますか？')) return;
+
+      resetInProgress = true;
+      localStorage.removeItem('idleBallsSave');
+
+      // 念のため削除できたことを確認してから再読み込み。
+      if (localStorage.getItem('idleBallsSave') !== null) {
+        resetInProgress = false;
+        alert('セーブデータの削除に失敗しました。');
+        return;
+      }
+
+      location.reload();
+    }
+
+
+    // 動画のような下部メニュー。ボールとPrestigeは横スクロール可能。
+    document.querySelectorAll('.menu-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const target = item.dataset.tab;
+        document.querySelectorAll('.menu-item').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(x => x.classList.remove('active'));
+        item.classList.add('active');
+        document.getElementById(target).classList.add('active');
+      });
+    });
+
+    // まず保存データがあれば復元。なければ新規ゲーム。
+    if (localStorage.getItem('idleBallsSave')) {
+      loadGame();
+    } else {
+      createCircles();
+      renderBallUpgrades();
+      updateUI();
+    }
+
+    // 操作中の進行を自動保存。
+    setInterval(() => {
+      if (!resetInProgress) saveGame();
+    }, 10000);
+
+    // リセット時の再読み込みでは、削除したデータを保存し直さない。
+    window.addEventListener('beforeunload', () => {
+      if (!resetInProgress) saveGame();
+    });
+
+    requestAnimationFrame(gameLoop);
+    
+    function tupg() {
+      // タップ強化は、ステータス変更と同じ処理内でカードを即時再描画する。
+      if (points < tapCost) return;
+
+      points -= tapCost;
+      tapAttack = (tapAttack * 108n) / 100n + 1n;
+      tapCost = (tapCost * 17n) / 10n;
+      if (tapCost < 1n) tapCost = 1n;
+
+      // タップカードの攻撃力・次の強化価格を即時反映。
+      renderBallUpgrades();
+      renderBallInfo();
+      updateUI();
+      saveGame();
+    }
+
+function mou() {
+
+let moo = document.getElementById('mo');
+
+moo.innerHTML = "<button onclick='tupd()'>MOD</button>";
+
+}
+
+function tupdsd() {
+
+const stageInput = prompt("ステージ番号を入力してください（1以上の整数）");
+let numg;
+try {
+  numg = BigInt((stageInput ?? "").trim());
+} catch (e) {
+  alert("ステージは1以上の整数で入力してください。");
+  return;
+}
+if (numg < 1n) {
+  alert("ステージは1以上で入力してください。");
+  return;
+}
+
+stage = numg;
+      createCircles();
+
+tapAttack = tapAttack + 10n ** stage;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+
+function tupd() {
+
+tapAttack = tapAttack * 1000n;
+
+
+renderBallUpgrades();
+renderBallInfo();
+updateUI();
+saveGame();
+
+
+
+
+}
+
+function tupdst() {
+
+tapAttack = 1n;
+
+
+renderBallUpgrades();
+      renderBallInfo();
+      updateUI();
+      saveGame();
+
+
+
+
+}
+
+function tupdp() {
+
+points = points * 0n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+function tupdpp() {
+
+points = points * 1000n;
+
+
+renderBallInfo();
+
+updateUI();
+
+
+
+
+
+}
+    
+  </script>
+  
+  <img src="images/b.png" style="height: 14px; width: 14px;"></img>
+<img src="images/iPhone.jpg" style="height: 14px; width: 14px;"></img>
+ <img src="images/c.png" style="height: 14px; width: 14px;"></img>
+<img src="images/d.png" style="height: 14px; width: 14px;"></img>  
+  <img src="images/e.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/f.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/g.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/h.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/i.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/j.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/k.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/l.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/m.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/jon.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/o.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/p.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/q.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/r.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/s.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/t.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/u.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/v.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/w.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/x.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/y.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/z.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/aa.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ab.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ac.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ad.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ae.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/af.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ag.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ah.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ai.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ak.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/al.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/am.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/an.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ao.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ap.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ar.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/as.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/at.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/au.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/av.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/aw.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ax.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ay.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/az.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ba.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bb.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bc.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bd.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/be.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bf.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bg.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bh.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bi.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bk.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bl.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bm.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bn.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/bo.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/bp.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/br.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bs.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bt.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bu.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bv.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bw.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bx.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/by.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/bz.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ca.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cb.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cc.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cd.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ce.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cf.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cg.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ch.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ci.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cj.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/ck.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cl.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cm.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cn.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/co.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cp.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cq.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cr.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/cs.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/1.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/2.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/3.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/4.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/5.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/6.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/7.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/8.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/悪口.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/9.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/10.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/11.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/12.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/13.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/14.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/15.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/16.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/17.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/18.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/19.png" style="height: 14px; width: 14px;"></img>
+  <img src="images/20.png" style="height: 14px; width: 14px;"></img>
+   <img src="images/papasika.png" style="height: 14px; width: 14px;"></img>
+ <img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン1.png" style="height: 14px; width: 14px;"></img>
+ <img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン2.png" style="height: 14px; width: 14px;"></img>
+ <img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン3.png" style="height: 14px; width: 14px;"></img>
+ <img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン4.png" style="height: 14px; width: 14px;"></img>
+ <img src="https://raw.githubusercontent.com/dnn702/Bal/refs/heads/main/images/アンパン5.png" style="height: 14px; width: 14px;"></img>
+  
+</body>
+</html>
