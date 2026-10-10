@@ -1,8 +1,8 @@
 
 {
   "id": "./tpa.html",
-  "name": "Idle Balls",
-  "short_name": "Idle Balls",
+  "name": "Idle Ball",
+  "short_name": "Idle Ball",
   "description": "Idle Balls - 自作ゲーム",
   "lang": "ja",
   "start_url": "./tpa.html",
