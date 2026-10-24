@@ -153,6 +153,17 @@ const fixedAvatars = [
         likes: "9ば",
         bad: "うばしか"
     },
+     {
+        id: "admin001B",
+        name: "日本平和回転寿司",
+        image: "assets/avatar/admin001B.png",
+        rare: 17,
+        cool: 400395,
+        cute: 249946,
+        cost: 33,
+        likes: "9ぼ",
+        bad: "-100"
+    },
     {
         id: "admin002",
         name: "テスト17",
