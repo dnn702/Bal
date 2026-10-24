@@ -143,6 +143,17 @@ const fixedAvatars = [
         bad: "なし"
     },
     {
+        id: "admin001A",
+        name: "GO！海の夏祭り",
+        image: "assets/avatar/admin001A.png",
+        rare: 17,
+        cool: 409301,
+        cute: 233323,
+        cost: 32,
+        likes: "9ば",
+        bad: "うばしか"
+    },
+    {
         id: "admin002",
         name: "テスト17",
         image: "assets/avatar/admin002.png",
